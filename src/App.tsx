@@ -490,37 +490,39 @@ export default function App() {
                         <strong>{consecutiveBoardCount} 家</strong>
                       </div>
                     </div>
-                    <div className="limitup-head">
-                      <span>股票</span>
-                      <span>价格</span>
-                      <span>涨停次数</span>
-                      <span>首次涨停</span>
-                      <span>开板次数</span>
-                      <span>封单额</span>
-                      <span>封单强度</span>
-                      <span>分类</span>
-                      <span>涨停原因</span>
-                      <span>股票行业</span>
-                    </div>
-                    {limitUpStocks.map((stock) => (
-                      <div className="limitup-row" key={stock.code}>
-                        <span>
-                          <strong>{stock.name}</strong>
-                          <small>{stock.code}</small>
-                        </span>
-                        <span>{currency(stock.price)}</span>
-                        <span>{stock.limitUpCount} 次</span>
-                        <span>{stock.firstLimitUpTime}</span>
-                        <span>{stock.openBoardCount} 次</span>
-                        <span>{stock.sealAmount}</span>
-                        <span>{stock.sealStrength}</span>
-                        <span className={stock.ladderType === "连板" ? "up" : "watch"}>
-                          {stock.ladderType}
-                        </span>
-                        <span>{stock.reason}</span>
-                        <span>{stock.industry}</span>
+                    <div className="table-scroll">
+                      <div className="limitup-head">
+                        <span>股票</span>
+                        <span>价格</span>
+                        <span>涨停次数</span>
+                        <span>首次涨停</span>
+                        <span>开板次数</span>
+                        <span>封单额</span>
+                        <span>封单强度</span>
+                        <span>分类</span>
+                        <span>涨停原因</span>
+                        <span>股票行业</span>
                       </div>
-                    ))}
+                      {limitUpStocks.map((stock) => (
+                        <div className="limitup-row" key={stock.code}>
+                          <span>
+                            <strong>{stock.name}</strong>
+                            <small>{stock.code}</small>
+                          </span>
+                          <span>{currency(stock.price)}</span>
+                          <span>{stock.limitUpCount} 次</span>
+                          <span>{stock.firstLimitUpTime}</span>
+                          <span>{stock.openBoardCount} 次</span>
+                          <span>{stock.sealAmount}</span>
+                          <span>{stock.sealStrength}</span>
+                          <span className={stock.ladderType === "连板" ? "up" : "watch"}>
+                            {stock.ladderType}
+                          </span>
+                          <span>{stock.reason}</span>
+                          <span>{stock.industry}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </article>
@@ -767,46 +769,48 @@ export default function App() {
                 </div>
 
                 {activePortfolioTab === "holdings" && (
-                  <div className="position-table">
-                    <div className="table-head">
-                      <span>股票</span>
-                      <span>持仓股数</span>
-                      <span>成本价</span>
-                      <span>现价</span>
-                      <span>总盈亏</span>
-                      <span>收益率</span>
-                      <span>纪律</span>
-                      <span>买入逻辑</span>
-                    </div>
-                    {portfolio.map((item) => {
-                      const currentValue = item.shares * item.price;
-                      const currentCost = item.shares * item.cost;
-                      const totalPnl = currentValue - currentCost;
-                      const returnRate = (totalPnl / currentCost) * 100;
-                      const thesis = thesisRecords.find((record) => record.code === item.code);
+                  <div className="table-scroll">
+                    <div className="position-table">
+                      <div className="table-head">
+                        <span>股票</span>
+                        <span>持仓股数</span>
+                        <span>成本价</span>
+                        <span>现价</span>
+                        <span>总盈亏</span>
+                        <span>收益率</span>
+                        <span>纪律</span>
+                        <span>买入逻辑</span>
+                      </div>
+                      {portfolio.map((item) => {
+                        const currentValue = item.shares * item.price;
+                        const currentCost = item.shares * item.cost;
+                        const totalPnl = currentValue - currentCost;
+                        const returnRate = (totalPnl / currentCost) * 100;
+                        const thesis = thesisRecords.find((record) => record.code === item.code);
 
-                      return (
-                        <div className="table-row wide-table-row" key={item.code}>
-                          <span>
-                            <strong>{item.name}</strong>
-                            <small>{item.code}</small>
-                          </span>
-                          <span>{item.shares}</span>
-                          <span>{currency(item.cost)}</span>
-                          <span>{currency(item.price)}</span>
-                          <span className={totalPnl >= 0 ? "up" : "down"}>
-                            {currency(totalPnl)}
-                          </span>
-                          <span className={returnRate >= 0 ? "up" : "down"}>
-                            {percent(returnRate)}
-                          </span>
-                          <span>
-                            目标 {item.targetPrice} / 止损 {item.stopLoss}
-                          </span>
-                          <span className="inline-thesis-cell">{thesis?.reason ?? item.thesis}</span>
-                        </div>
-                      );
-                    })}
+                        return (
+                          <div className="table-row wide-table-row" key={item.code}>
+                            <span>
+                              <strong>{item.name}</strong>
+                              <small>{item.code}</small>
+                            </span>
+                            <span>{item.shares}</span>
+                            <span>{currency(item.cost)}</span>
+                            <span>{currency(item.price)}</span>
+                            <span className={totalPnl >= 0 ? "up" : "down"}>
+                              {currency(totalPnl)}
+                            </span>
+                            <span className={returnRate >= 0 ? "up" : "down"}>
+                              {percent(returnRate)}
+                            </span>
+                            <span>
+                              目标 {item.targetPrice} / 止损 {item.stopLoss}
+                            </span>
+                            <span className="inline-thesis-cell">{thesis?.reason ?? item.thesis}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
 
