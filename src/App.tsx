@@ -25,6 +25,7 @@ type NavKey =
 type AiTabKey = "multimodal" | "strategy";
 type MarketTabKey = "heat" | "turnover" | "seal" | "winners";
 type InsightTabKey = "sectors" | "funds" | "ai";
+type PortfolioTabKey = "holdings" | "trades";
 
 interface NavItem {
   key: NavKey;
@@ -119,6 +120,7 @@ export default function App() {
   const [activeAiTab, setActiveAiTab] = useState<AiTabKey>("multimodal");
   const [activeMarketTab, setActiveMarketTab] = useState<MarketTabKey>("heat");
   const [activeInsightTab, setActiveInsightTab] = useState<InsightTabKey>("sectors");
+  const [activePortfolioTab, setActivePortfolioTab] = useState<PortfolioTabKey>("holdings");
   const [portfolio] = useState(holdings);
   const marketValue = useMemo(() => totalMarketValue(portfolio), [portfolio]);
   const costValue = useMemo(() => totalCostValue(portfolio), [portfolio]);
@@ -552,48 +554,102 @@ export default function App() {
               <article className="card wide">
                 <div className="card-head">
                   <div>
-                    <p className="section-kicker">Holdings</p>
-                    <h2>持仓列表</h2>
+                    <p className="section-kicker">Portfolio Book</p>
+                    <h2>持仓与交易</h2>
                   </div>
                 </div>
-                <div className="position-table">
-                  <div className="table-head">
-                    <span>股票</span>
-                    <span>持仓股数</span>
-                    <span>成本价</span>
-                    <span>现价</span>
-                    <span>总盈亏</span>
-                    <span>收益率</span>
-                    <span>纪律</span>
-                  </div>
-                  {portfolio.map((item) => {
-                    const currentValue = item.shares * item.price;
-                    const currentCost = item.shares * item.cost;
-                    const totalPnl = currentValue - currentCost;
-                    const returnRate = (totalPnl / currentCost) * 100;
+                <div className="subnav-row">
+                  <button
+                    type="button"
+                    className={`subnav-btn ${activePortfolioTab === "holdings" ? "active" : ""}`}
+                    onClick={() => setActivePortfolioTab("holdings")}
+                  >
+                    持仓列表
+                  </button>
+                  <button
+                    type="button"
+                    className={`subnav-btn ${activePortfolioTab === "trades" ? "active" : ""}`}
+                    onClick={() => setActivePortfolioTab("trades")}
+                  >
+                    交易记录
+                  </button>
+                </div>
 
-                    return (
-                      <div className="table-row" key={item.code}>
-                        <span>
-                          <strong>{item.name}</strong>
-                          <small>{item.code}</small>
-                        </span>
-                        <span>{item.shares}</span>
-                        <span>{currency(item.cost)}</span>
-                        <span>{currency(item.price)}</span>
-                        <span className={totalPnl >= 0 ? "up" : "down"}>
-                          {currency(totalPnl)}
-                        </span>
-                        <span className={returnRate >= 0 ? "up" : "down"}>
-                          {percent(returnRate)}
-                        </span>
-                        <span>
-                          目标 {item.targetPrice} / 止损 {item.stopLoss}
-                        </span>
+                {activePortfolioTab === "holdings" && (
+                  <div className="position-table">
+                    <div className="table-head">
+                      <span>股票</span>
+                      <span>持仓股数</span>
+                      <span>成本价</span>
+                      <span>现价</span>
+                      <span>总盈亏</span>
+                      <span>收益率</span>
+                      <span>纪律</span>
+                    </div>
+                    {portfolio.map((item) => {
+                      const currentValue = item.shares * item.price;
+                      const currentCost = item.shares * item.cost;
+                      const totalPnl = currentValue - currentCost;
+                      const returnRate = (totalPnl / currentCost) * 100;
+                      const thesis = thesisRecords.find((record) => record.code === item.code);
+
+                      return (
+                        <div className="holding-detail-card" key={item.code}>
+                          <div className="table-row">
+                            <span>
+                              <strong>{item.name}</strong>
+                              <small>{item.code}</small>
+                            </span>
+                            <span>{item.shares}</span>
+                            <span>{currency(item.cost)}</span>
+                            <span>{currency(item.price)}</span>
+                            <span className={totalPnl >= 0 ? "up" : "down"}>
+                              {currency(totalPnl)}
+                            </span>
+                            <span className={returnRate >= 0 ? "up" : "down"}>
+                              {percent(returnRate)}
+                            </span>
+                            <span>
+                              目标 {item.targetPrice} / 止损 {item.stopLoss}
+                            </span>
+                          </div>
+                          {thesis && (
+                            <div className="buy-thesis-inline">
+                              <span className="buy-thesis-label">买入逻辑</span>
+                              <p>{thesis.reason}</p>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {activePortfolioTab === "trades" && (
+                  <div className="trade-list">
+                    {tradeRecords.map((trade) => (
+                      <div className="trade-item" key={trade.id}>
+                        <div>
+                          <strong>
+                            {trade.action === "buy" ? "买入" : "卖出"} {trade.name}
+                          </strong>
+                          <p>
+                            {trade.date} · {trade.code}
+                          </p>
+                        </div>
+                        <div className="trade-side">
+                          <span className={trade.action === "buy" ? "up" : "down"}>
+                            {trade.action === "buy" ? "+" : "-"}
+                            {trade.shares} 股
+                          </span>
+                          <p>
+                            成交价 {currency(trade.price)} · {trade.note}
+                          </p>
+                        </div>
                       </div>
-                    );
-                  })}
-                </div>
+                    ))}
+                  </div>
+                )}
               </article>
 
               <article className="card">
@@ -610,38 +666,6 @@ export default function App() {
                       <div>
                         <strong>{signal.title}</strong>
                         <p>{signal.detail}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </article>
-
-              <article className="card wide">
-                <div className="card-head">
-                  <div>
-                    <p className="section-kicker">Trades</p>
-                    <h2>交易记录</h2>
-                  </div>
-                </div>
-                <div className="trade-list">
-                  {tradeRecords.map((trade) => (
-                    <div className="trade-item" key={trade.id}>
-                      <div>
-                        <strong>
-                          {trade.action === "buy" ? "买入" : "卖出"} {trade.name}
-                        </strong>
-                        <p>
-                          {trade.date} · {trade.code}
-                        </p>
-                      </div>
-                      <div className="trade-side">
-                        <span className={trade.action === "buy" ? "up" : "down"}>
-                          {trade.action === "buy" ? "+" : "-"}
-                          {trade.shares} 股
-                        </span>
-                        <p>
-                          成交价 {currency(trade.price)} · {trade.note}
-                        </p>
                       </div>
                     </div>
                   ))}
