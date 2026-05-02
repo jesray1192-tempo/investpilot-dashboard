@@ -460,6 +460,36 @@ h2 {
   line-height: 1.6;
 }
 
+.upload-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.upload-trigger,
+.action-btn {
+  border-radius: 999px;
+  padding: 0.9rem 1.2rem;
+  background: linear-gradient(135deg, #ee7c38, #e6523c);
+  color: #fff8ef;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+}
+
+.hidden-file-input {
+  display: none;
+}
+
+.upload-hint {
+  color: rgba(242, 239, 232, 0.58);
+  font-size: 0.9rem;
+}
+
 .upload-inline-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -503,6 +533,16 @@ h2 {
 .real-textarea {
   min-height: 120px;
   resize: vertical;
+}
+
+.compact-textarea {
+  min-height: 90px;
+}
+
+.upload-toolbar {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .generated-grid {

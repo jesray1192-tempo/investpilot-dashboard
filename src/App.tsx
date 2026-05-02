@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { ChangeEvent, DragEvent, useMemo, useState } from "react";
 import {
   dataSources,
   fundFlowBoards,
@@ -30,6 +30,12 @@ type PortfolioTabKey = "holdings" | "trades";
 type PolicyMaterial = {
   name: string;
   kind: string;
+};
+
+type UploadAsset = {
+  name: string;
+  kind: string;
+  source: "file" | "link";
 };
 
 interface NavItem {
@@ -172,12 +178,41 @@ function buildPolicyOutput(policyUrl: string, policyTheme: string, policyNote: s
   };
 }
 
+function buildMultimodalOutput(
+  assets: UploadAsset[],
+  linkValue: string,
+  noteValue: string,
+  runCount: number
+) {
+  const focus = noteValue.trim() || "市场主线与潜在催化";
+  const sourceText =
+    assets.length > 0
+      ? `已导入 ${assets.length} 份材料，重点围绕 ${assets.map((asset) => asset.kind).join("、")}`
+      : "当前以链接与文字补充为主";
+  const linkText = linkValue.trim() || "未填写外部链接";
+  const stageText = runCount > 0 ? "已完成一轮初步解读" : "等待开始分析";
+
+  return {
+    traits: `${stageText}。${sourceText}，AI 当前识别的核心关注点是“${focus}”，并把材料聚焦到政策信号、产业景气和情绪驱动三个层面。`,
+    analysis: `从内容结构看，链接来源为 ${linkText}。若材料来自视频或截图，AI 会更偏重识别表述语气、重复关键词和可能被市场放大的片段，再结合你的补充说明做二次归因。`,
+    strategy: `策略上建议先把材料拆成“直接受益”“间接受益”“情绪映射”三类，再优先跟踪最容易形成资金共识的行业龙头与弹性标的。对于尚未证实的结论，宜放入观察清单而不是直接重仓。`,
+    risk: `风险主要在信息截取不完整、视频观点带宣传色彩、文章立场先行以及截图缺少上下文。若单一材料无法和官方数据、公告或行业事实交叉验证，应降低置信度。`
+  };
+}
+
 export default function App() {
   const [activeNav, setActiveNav] = useState<NavKey>("home");
   const [activeAiTab, setActiveAiTab] = useState<AiTabKey>("multimodal");
   const [activeMarketTab, setActiveMarketTab] = useState<MarketTabKey>("heat");
   const [activeInsightTab, setActiveInsightTab] = useState<InsightTabKey>("sectors");
   const [activePortfolioTab, setActivePortfolioTab] = useState<PortfolioTabKey>("holdings");
+  const [aiLinkInput, setAiLinkInput] = useState("");
+  const [aiNoteInput, setAiNoteInput] = useState("重点判断材料里的产业催化是否能转化为真实投资主线。");
+  const [uploadAssets, setUploadAssets] = useState<UploadAsset[]>([
+    { name: "路演纪要截图.png", kind: "图片", source: "file" },
+    { name: "政策解读视频链接", kind: "视频链接", source: "link" }
+  ]);
+  const [analysisRuns, setAnalysisRuns] = useState(1);
   const [policyUrl, setPolicyUrl] = useState("https://www.gov.cn/yaowen/liebiao/202505/content_7024210.htm");
   const [policyTheme, setPolicyTheme] = useState("十五五规划");
   const [policyNote, setPolicyNote] = useState("重点看低空经济、自主可控和设备更新链条。");
@@ -220,6 +255,74 @@ export default function App() {
     () => buildPolicyOutput(policyUrl, policyTheme, policyNote),
     [policyUrl, policyTheme, policyNote]
   );
+  const multimodalOutput = useMemo(
+    () => buildMultimodalOutput(uploadAssets, aiLinkInput, aiNoteInput, analysisRuns),
+    [uploadAssets, aiLinkInput, aiNoteInput, analysisRuns]
+  );
+
+  function mergeAssets(nextAssets: UploadAsset[]) {
+    setUploadAssets((current) => [...current, ...nextAssets]);
+  }
+
+  function handleFileSelection(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? []);
+    if (files.length === 0) {
+      return;
+    }
+
+    mergeAssets(
+      files.map((file) => ({
+        name: file.name,
+        kind: file.type.startsWith("image/")
+          ? "图片"
+          : file.type.startsWith("video/")
+            ? "视频"
+            : "文件",
+        source: "file" as const
+      }))
+    );
+    event.target.value = "";
+  }
+
+  function handleUploadDrop(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    const files = Array.from(event.dataTransfer.files ?? []);
+    if (files.length === 0) {
+      return;
+    }
+
+    mergeAssets(
+      files.map((file) => ({
+        name: file.name,
+        kind: file.type.startsWith("image/")
+          ? "图片"
+          : file.type.startsWith("video/")
+            ? "视频"
+            : "文件",
+        source: "file" as const
+      }))
+    );
+  }
+
+  function handleAddLinkAsset() {
+    const trimmedLink = aiLinkInput.trim();
+    if (!trimmedLink) {
+      return;
+    }
+
+    setUploadAssets((current) => [
+      ...current,
+      {
+        name: trimmedLink,
+        kind: trimmedLink.includes("video") || trimmedLink.includes("bilibili") ? "视频链接" : "文章链接",
+        source: "link"
+      }
+    ]);
+  }
+
+  function handleAnalyze() {
+    setAnalysisRuns((count) => count + 1);
+  }
 
   return (
     <main className="app-shell app-layout">
@@ -856,20 +959,73 @@ export default function App() {
                 <>
                   <section className="multimodal-layout">
                     <div className="upload-panel">
-                      <div className="upload-dropzone">
+                      <div
+                        className="upload-dropzone"
+                        onDragOver={(event) => event.preventDefault()}
+                        onDrop={handleUploadDrop}
+                      >
                         <strong>上传视频 / 图片 / 文件</strong>
                         <p>支持视频、截图、研报 PDF、会议纪要、政策文件、财报和各类文档。</p>
-                        <button type="button">选择本地文件</button>
+                        <div className="upload-actions">
+                          <label className="upload-trigger">
+                            选择本地文件
+                            <input
+                              className="hidden-file-input"
+                              type="file"
+                              multiple
+                              onChange={handleFileSelection}
+                            />
+                          </label>
+                          <span className="upload-hint">也可以直接拖拽文件到这里</span>
+                        </div>
                       </div>
 
                       <div className="upload-inline-grid">
                         <div className="upload-input-card">
                           <strong>视频地址 / 文章地址</strong>
-                          <div className="fake-input">粘贴视频链接、公众号文章链接、网页地址</div>
+                          <input
+                            className="real-input"
+                            value={aiLinkInput}
+                            onChange={(event) => setAiLinkInput(event.target.value)}
+                            placeholder="粘贴视频链接、文章链接、网页地址"
+                          />
                         </div>
                         <div className="upload-input-card">
                           <strong>截图补充说明</strong>
-                          <div className="fake-input">补充截图来源、时间、上下文和你的关注点</div>
+                          <textarea
+                            className="real-textarea compact-textarea"
+                            value={aiNoteInput}
+                            onChange={(event) => setAiNoteInput(event.target.value)}
+                            placeholder="补充截图来源、时间、上下文和你的关注点"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="upload-toolbar">
+                        <button type="button" className="secondary action-btn" onClick={handleAddLinkAsset}>
+                          添加链接到材料列表
+                        </button>
+                        <button type="button" className="action-btn" onClick={handleAnalyze}>
+                          开始分析
+                        </button>
+                      </div>
+
+                      <div className="material-list-card">
+                        <div className="card-head compact-head">
+                          <div>
+                            <p className="section-kicker">Assets</p>
+                            <h2>已导入文件列表</h2>
+                          </div>
+                        </div>
+                        <div className="material-list">
+                          {uploadAssets.map((asset, index) => (
+                            <div className="material-item" key={`${asset.name}-${index}`}>
+                              <strong>{asset.name}</strong>
+                              <span>
+                                {asset.kind} · {asset.source === "file" ? "本地文件" : "外部链接"}
+                              </span>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     </div>
@@ -877,19 +1033,19 @@ export default function App() {
                     <div className="generated-grid">
                       <div className="placeholder-card">
                         <strong>AI 识别特点</strong>
-                        <p>自动提炼内容主题、核心观点、产业信号、情绪倾向和市场关注点。</p>
+                        <p>{multimodalOutput.traits}</p>
                       </div>
                       <div className="placeholder-card">
                         <strong>AI 深度分析</strong>
-                        <p>分析信息背后的逻辑链条、受益环节、证据强度和潜在催化路径。</p>
+                        <p>{multimodalOutput.analysis}</p>
                       </div>
                       <div className="placeholder-card">
                         <strong>投资策略</strong>
-                        <p>输出受益方向、利空方向、可跟踪标的、仓位建议和观察顺序。</p>
+                        <p>{multimodalOutput.strategy}</p>
                       </div>
                       <div className="placeholder-card">
                         <strong>风险与偏差提醒</strong>
-                        <p>识别宣传倾向、证据不足、因果跳跃和容易误导决策的表述。</p>
+                        <p>{multimodalOutput.risk}</p>
                       </div>
                     </div>
                   </section>
