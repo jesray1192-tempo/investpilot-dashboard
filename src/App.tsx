@@ -494,8 +494,10 @@ export default function App() {
                       <span>股票</span>
                       <span>价格</span>
                       <span>涨停次数</span>
+                      <span>首次涨停</span>
                       <span>开板次数</span>
                       <span>封单额</span>
+                      <span>封单强度</span>
                       <span>分类</span>
                       <span>涨停原因</span>
                       <span>股票行业</span>
@@ -508,8 +510,10 @@ export default function App() {
                         </span>
                         <span>{currency(stock.price)}</span>
                         <span>{stock.limitUpCount} 次</span>
+                        <span>{stock.firstLimitUpTime}</span>
                         <span>{stock.openBoardCount} 次</span>
                         <span>{stock.sealAmount}</span>
+                        <span>{stock.sealStrength}</span>
                         <span className={stock.ladderType === "连板" ? "up" : "watch"}>
                           {stock.ladderType}
                         </span>
