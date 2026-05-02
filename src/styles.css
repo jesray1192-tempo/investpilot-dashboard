@@ -484,10 +484,72 @@ h2 {
   align-items: center;
 }
 
+.real-input,
+.real-textarea {
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.02);
+  color: #f2efe8;
+  padding: 15px 16px;
+  font: inherit;
+}
+
+.real-input::placeholder,
+.real-textarea::placeholder {
+  color: rgba(242, 239, 232, 0.45);
+}
+
+.real-textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
 .generated-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
+}
+
+.material-list-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 20px;
+  padding: 18px;
+}
+
+.compact-head {
+  margin-bottom: 12px;
+}
+
+.material-list {
+  display: grid;
+  gap: 10px;
+}
+
+.material-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 14px;
+  padding: 14px 16px;
+}
+
+.material-item strong {
+  font-size: 0.98rem;
+}
+
+.material-item span {
+  color: rgba(242, 239, 232, 0.58);
+  font-size: 0.85rem;
+}
+
+.policy-ai-panel {
+  display: grid;
+  gap: 24px;
 }
 
 .limitup-table {
