@@ -490,6 +490,51 @@ h2 {
   gap: 16px;
 }
 
+.policy-link-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.policy-link-card {
+  display: grid;
+  gap: 12px;
+  text-decoration: none;
+  color: inherit;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 20px;
+  padding: 20px;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.policy-link-card:hover {
+  border-color: rgba(99, 157, 255, 0.32);
+  transform: translateY(-1px);
+}
+
+.policy-link-tag {
+  color: #e9b487;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.policy-link-card strong {
+  font-size: 1.25rem;
+}
+
+.policy-link-card p {
+  margin: 0;
+  color: rgba(242, 239, 232, 0.72);
+  line-height: 1.6;
+}
+
+.policy-link-action {
+  color: #8db7ff;
+  font-size: 0.92rem;
+}
+
 .subnav-row {
   display: flex;
   gap: 12px;
@@ -836,7 +881,8 @@ h2 {
   }
 
   .upload-inline-grid,
-  .generated-grid {
+  .generated-grid,
+  .policy-link-grid {
     grid-template-columns: 1fr;
   }
 

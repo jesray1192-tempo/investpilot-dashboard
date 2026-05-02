@@ -44,6 +44,45 @@ const navItems: NavItem[] = [
   { key: "us", label: "美股", icon: "◇", description: "纳指、标普与中概跟踪" }
 ];
 
+const policyLinks = [
+  {
+    title: "“十五五”规划编制工作",
+    description: "中国政府网关于“十五五”规划编制与建议解读的官方入口。",
+    href: "https://www.gov.cn/yaowen/liebiao/202505/content_7024210.htm",
+    tag: "中国政府网"
+  },
+  {
+    title: "“十五五”规划建议解读",
+    description: "中国政府网政策解读栏目，可持续跟踪规划建议和相关政策说明。",
+    href: "https://www.gov.cn/zhengce/202511/content_7048880.htm",
+    tag: "政策解读"
+  },
+  {
+    title: "国际形势与外交动态",
+    description: "外交部官网官方入口，适合跟踪国际局势、记者会和外交表态。",
+    href: "https://www.mfa.gov.cn/",
+    tag: "外交部"
+  },
+  {
+    title: "外交部例行记者会",
+    description: "观察国际热点、地缘政策和官方口径变化的直接来源。",
+    href: "https://www.mfa.gov.cn/web/",
+    tag: "记者会"
+  },
+  {
+    title: "新闻联播",
+    description: "央视《新闻联播》官方栏目页，可直接回看每日重点议题。",
+    href: "https://tv.cctv.com/lm/xwlb/",
+    tag: "央视官方"
+  },
+  {
+    title: "新闻1+1",
+    description: "央视官方时事评论栏目，适合作为新闻联播后的热点延伸分析入口。",
+    href: "https://news.cctv.com/news_2007/20080627/106156.shtml",
+    tag: "热点分析"
+  }
+];
+
 function currency(value: number) {
   return new Intl.NumberFormat("zh-CN", {
     style: "currency",
@@ -800,11 +839,29 @@ export default function App() {
         )}
 
         {activeNav === "policy" && (
-          <PlaceholderSection
-            title="政策分析"
-            summary="这里会追踪宏观政策、行业监管、产业扶持和对市场热点的影响传导。"
-            bullets={["宏观政策", "产业扶持", "监管动态", "受益方向"]}
-          />
+          <section className="placeholder-view">
+            <article className="card wide">
+              <p className="placeholder-summary">
+                这里直接汇总政策分析常用的官方来源，优先用于跟踪“十五五”规划、国际形势，以及每日《新闻联播》后的热点延伸分析。
+              </p>
+              <div className="policy-link-grid">
+                {policyLinks.map((link) => (
+                  <a
+                    className="policy-link-card"
+                    href={link.href}
+                    key={link.href}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <span className="policy-link-tag">{link.tag}</span>
+                    <strong>{link.title}</strong>
+                    <p>{link.description}</p>
+                    <span className="policy-link-action">打开官方页面</span>
+                  </a>
+                ))}
+              </div>
+            </article>
+          </section>
         )}
 
         {activeNav === "funds" && (
