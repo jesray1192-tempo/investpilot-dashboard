@@ -709,13 +709,6 @@ export default function App() {
         {activeNav === "ai" && (
           <section className="placeholder-view">
             <article className="card wide">
-              <div className="card-head">
-                <div>
-                  <p className="section-kicker">AI Analysis</p>
-                  <h1>AI分析</h1>
-                </div>
-              </div>
-
               <div className="subnav-row">
                 <button
                   type="button"
