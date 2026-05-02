@@ -22,6 +22,8 @@ type NavKey =
   | "hk"
   | "us";
 
+type AiTabKey = "multimodal" | "strategy";
+
 interface NavItem {
   key: NavKey;
   label: string;
@@ -112,6 +114,7 @@ function PlaceholderSection({
 
 export default function App() {
   const [activeNav, setActiveNav] = useState<NavKey>("home");
+  const [activeAiTab, setActiveAiTab] = useState<AiTabKey>("multimodal");
   const [portfolio] = useState(holdings);
   const marketValue = useMemo(() => totalMarketValue(portfolio), [portfolio]);
   const costValue = useMemo(() => totalCostValue(portfolio), [portfolio]);
@@ -704,11 +707,86 @@ export default function App() {
         )}
 
         {activeNav === "ai" && (
-          <PlaceholderSection
-            title="AI分析"
-            summary="这里会聚合盘前计划、盘中异动解释、仓位诊断、个股打分和复盘结论。"
-            bullets={["盘前策略", "盘中解读", "个股评分", "盘后复盘"]}
-          />
+          <section className="placeholder-view">
+            <article className="card wide">
+              <div className="card-head">
+                <div>
+                  <p className="section-kicker">AI Analysis</p>
+                  <h1>AI分析</h1>
+                </div>
+              </div>
+
+              <div className="subnav-row">
+                <button
+                  type="button"
+                  className={`subnav-btn ${activeAiTab === "multimodal" ? "active" : ""}`}
+                  onClick={() => setActiveAiTab("multimodal")}
+                >
+                  多模态分析
+                </button>
+                <button
+                  type="button"
+                  className={`subnav-btn ${activeAiTab === "strategy" ? "active" : ""}`}
+                  onClick={() => setActiveAiTab("strategy")}
+                >
+                  策略诊断
+                </button>
+              </div>
+
+              {activeAiTab === "multimodal" && (
+                <>
+                  <p className="placeholder-summary">
+                    这个子页面用于上传视频、图片、研报、会议纪要、公告和截图，让 AI
+                    自动识别关键信息，提炼内容特点，并输出可执行的投资策略。
+                  </p>
+                  <div className="placeholder-grid">
+                    <div className="placeholder-card">
+                      <strong>上传视频 / 图片 / 文件</strong>
+                      <p>支持路演视频、新闻截图、研报 PDF、政策文件和财报材料。</p>
+                    </div>
+                    <div className="placeholder-card">
+                      <strong>自动总结特点</strong>
+                      <p>提炼核心观点、产业信号、情绪倾向、估值锚点和市场关注点。</p>
+                    </div>
+                    <div className="placeholder-card">
+                      <strong>输出投资策略</strong>
+                      <p>给出受益方向、利空方向、适合关注的标的和仓位建议。</p>
+                    </div>
+                    <div className="placeholder-card">
+                      <strong>风险与偏差提醒</strong>
+                      <p>识别资料中的宣传倾向、证据不足点和可能误导的表述。</p>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {activeAiTab === "strategy" && (
+                <>
+                  <p className="placeholder-summary">
+                    这个子页面用于盘前计划、盘中跟踪、仓位诊断、个股打分和盘后复盘。
+                  </p>
+                  <div className="placeholder-grid">
+                    <div className="placeholder-card">
+                      <strong>盘前策略</strong>
+                      <p>根据指数、板块和资金风格生成当日应对计划。</p>
+                    </div>
+                    <div className="placeholder-card">
+                      <strong>盘中解读</strong>
+                      <p>解释异动原因，区分趋势延续、情绪脉冲和资金试盘。</p>
+                    </div>
+                    <div className="placeholder-card">
+                      <strong>个股评分</strong>
+                      <p>从基本面、催化、资金、筹码和风险五维打分。</p>
+                    </div>
+                    <div className="placeholder-card">
+                      <strong>复盘结论</strong>
+                      <p>沉淀当天得失、验证逻辑，并形成下个交易日观察清单。</p>
+                    </div>
+                  </div>
+                </>
+              )}
+            </article>
+          </section>
         )}
 
         {activeNav === "policy" && (

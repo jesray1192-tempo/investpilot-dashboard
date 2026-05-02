@@ -423,6 +423,24 @@ h2 {
   line-height: 1.6;
 }
 
+.subnav-row {
+  display: flex;
+  gap: 12px;
+  margin: 8px 0 20px;
+  flex-wrap: wrap;
+}
+
+.subnav-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #f2efe8;
+}
+
+.subnav-btn.active {
+  background: rgba(63, 133, 255, 0.18);
+  border: 1px solid rgba(63, 133, 255, 0.28);
+}
+
 .position-table,
 .trade-list,
 .thesis-list {
@@ -716,6 +734,11 @@ h2 {
   }
 
   .placeholder-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .subnav-row {
+    display: grid;
     grid-template-columns: 1fr;
   }
 
