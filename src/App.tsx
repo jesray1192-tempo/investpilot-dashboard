@@ -901,36 +901,6 @@ export default function App() {
                 </div>
               </article>
 
-              <article className="card wide">
-                <div className="card-head">
-                  <div>
-                    <p className="section-kicker">Thesis</p>
-                    <h2>投资逻辑</h2>
-                  </div>
-                </div>
-                <div className="thesis-list">
-                  {thesisRecords.map((record) => (
-                    <div className="thesis-item" key={record.code}>
-                      <div className="thesis-title">
-                        <strong>{record.title}</strong>
-                        <span>{record.code}</span>
-                      </div>
-                      <p>
-                        <strong>为什么买：</strong>
-                        {record.reason}
-                      </p>
-                      <p>
-                        <strong>继续观察：</strong>
-                        {record.trigger}
-                      </p>
-                      <p>
-                        <strong>什么情况下卖：</strong>
-                        {record.exitRule}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </article>
             </section>
           </section>
         )}
