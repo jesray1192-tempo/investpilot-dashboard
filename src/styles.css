@@ -625,7 +625,7 @@ h2 {
 .limitup-head,
 .limitup-row {
   display: grid;
-  grid-template-columns: 1.05fr 0.75fr 0.7fr 0.7fr 0.8fr 0.8fr 1.7fr 1fr;
+  grid-template-columns: 1fr 0.7fr 0.65fr 0.75fr 0.7fr 0.8fr 0.8fr 0.7fr 1.55fr 0.9fr;
   gap: 14px;
   align-items: center;
 }

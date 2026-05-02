@@ -92,6 +92,8 @@ export const limitUpStocks: LimitUpStock[] = [
     limitUpCount: 2,
     openBoardCount: 1,
     sealAmount: "3.8亿",
+    firstLimitUpTime: "09:34",
+    sealStrength: "强",
     ladderType: "连板",
     reason: "低空经济与飞行汽车概念持续发酵",
     industry: "汽车零部件"
@@ -103,6 +105,8 @@ export const limitUpStocks: LimitUpStock[] = [
     limitUpCount: 1,
     openBoardCount: 0,
     sealAmount: "1.6亿",
+    firstLimitUpTime: "10:12",
+    sealStrength: "中强",
     ladderType: "首板",
     reason: "机器人执行器方向资金回流",
     industry: "自动化设备"
@@ -114,6 +118,8 @@ export const limitUpStocks: LimitUpStock[] = [
     limitUpCount: 1,
     openBoardCount: 2,
     sealAmount: "2.1亿",
+    firstLimitUpTime: "10:48",
+    sealStrength: "中",
     ladderType: "首板",
     reason: "铜缆高速连接题材活跃",
     industry: "通信设备"
@@ -125,6 +131,8 @@ export const limitUpStocks: LimitUpStock[] = [
     limitUpCount: 3,
     openBoardCount: 0,
     sealAmount: "5.2亿",
+    firstLimitUpTime: "09:26",
+    sealStrength: "极强",
     ladderType: "连板",
     reason: "智能汽车主线强化，龙头情绪溢价明显",
     industry: "乘用车"
