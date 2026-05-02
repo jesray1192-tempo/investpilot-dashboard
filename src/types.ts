@@ -68,6 +68,15 @@ export interface FundFlowBoard {
   note: string;
 }
 
+export interface LimitUpStock {
+  code: string;
+  name: string;
+  price: number;
+  limitUpCount: number;
+  reason: string;
+  industry: string;
+}
+
 export interface TradeRecord {
   id: string;
   date: string;

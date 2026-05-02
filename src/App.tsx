@@ -893,6 +893,55 @@ export default function App() {
                 ))}
               </div>
             </article>
+
+            <article className="card wide">
+              <div className="card-head">
+                <div>
+                  <p className="section-kicker">AI Interpretation</p>
+                  <h2>AI 热点解读区</h2>
+                </div>
+              </div>
+
+              <div className="policy-ai-panel">
+                <div className="upload-panel">
+                  <div className="upload-dropzone">
+                    <strong>粘贴官方链接 / 上传政策材料</strong>
+                    <p>支持政府官网链接、外交部页面、新闻联播回放链接、PDF、截图和纪要材料。</p>
+                    <button type="button">导入政策材料</button>
+                  </div>
+
+                  <div className="upload-inline-grid">
+                    <div className="upload-input-card">
+                      <strong>政策链接或文章地址</strong>
+                      <div className="fake-input">粘贴中国政府网、外交部、央视网等官方页面地址</div>
+                    </div>
+                    <div className="upload-input-card">
+                      <strong>你的关注主题</strong>
+                      <div className="fake-input">例如：低空经济、算力、自主可控、外贸、国企改革</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="generated-grid">
+                  <div className="placeholder-card">
+                    <strong>政策要点摘要</strong>
+                    <p>自动提炼政策目标、关键词、执行路径、时间维度和涉及部门。</p>
+                  </div>
+                  <div className="placeholder-card">
+                    <strong>热点影响分析</strong>
+                    <p>识别哪些主题会强化，哪些板块可能受压制，判断影响是短期情绪还是中期产业逻辑。</p>
+                  </div>
+                  <div className="placeholder-card">
+                    <strong>投资策略建议</strong>
+                    <p>输出优先跟踪方向、受益行业、可观察标的和适合的仓位节奏。</p>
+                  </div>
+                  <div className="placeholder-card">
+                    <strong>风险与偏差提醒</strong>
+                    <p>提示政策口径与市场解读的偏差、兑现周期过长、主题交易过热等风险。</p>
+                  </div>
+                </div>
+              </div>
+            </article>
           </section>
         )}
 

@@ -2,6 +2,7 @@ import {
   DataSource,
   FundFlowBoard,
   Holding,
+  LimitUpStock,
   MarketBreadth,
   MarketEvent,
   MarketIndex,
@@ -80,6 +81,41 @@ export const fundFlowBoards: FundFlowBoard[] = [
     inflow: "+4.1亿",
     strength: "watch",
     note: "修复中继，持续性仍需观察。"
+  }
+];
+
+export const limitUpStocks: LimitUpStock[] = [
+  {
+    code: "002085",
+    name: "万丰奥威",
+    price: 17.62,
+    limitUpCount: 2,
+    reason: "低空经济与飞行汽车概念持续发酵",
+    industry: "汽车零部件"
+  },
+  {
+    code: "603728",
+    name: "鸣志电器",
+    price: 58.41,
+    limitUpCount: 1,
+    reason: "机器人执行器方向资金回流",
+    industry: "自动化设备"
+  },
+  {
+    code: "002130",
+    name: "沃尔核材",
+    price: 22.36,
+    limitUpCount: 1,
+    reason: "铜缆高速连接题材活跃",
+    industry: "通信设备"
+  },
+  {
+    code: "601127",
+    name: "赛力斯",
+    price: 97.15,
+    limitUpCount: 3,
+    reason: "智能汽车主线强化，龙头情绪溢价明显",
+    industry: "乘用车"
   }
 ];
 
