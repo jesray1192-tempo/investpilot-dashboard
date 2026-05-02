@@ -495,10 +495,35 @@ h2 {
   gap: 12px;
 }
 
+.limitup-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 6px;
+}
+
+.limitup-summary-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 18px;
+  padding: 16px;
+  display: grid;
+  gap: 10px;
+}
+
+.limitup-summary-card span {
+  color: rgba(242, 239, 232, 0.62);
+  font-size: 0.86rem;
+}
+
+.limitup-summary-card strong {
+  font-size: 1.65rem;
+}
+
 .limitup-head,
 .limitup-row {
   display: grid;
-  grid-template-columns: 1.1fr 0.8fr 0.8fr 1.8fr 1fr;
+  grid-template-columns: 1.05fr 0.75fr 0.7fr 0.7fr 0.8fr 0.8fr 1.7fr 1fr;
   gap: 14px;
   align-items: center;
 }
@@ -919,6 +944,10 @@ h2 {
 
   .limitup-head {
     display: none;
+  }
+
+  .limitup-summary-grid {
+    grid-template-columns: 1fr 1fr;
   }
 
   .table-row,
