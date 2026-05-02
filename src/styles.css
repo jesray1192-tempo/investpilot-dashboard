@@ -232,7 +232,7 @@ h2 {
 
 .overview-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 24px;
   margin: 24px 0;
 }
@@ -294,6 +294,10 @@ h2 {
 
 .metric-card {
   min-height: 250px;
+}
+
+.market-tabs-card {
+  min-height: 360px;
 }
 
 .heat-card {
@@ -428,6 +432,10 @@ h2 {
   gap: 12px;
   margin: 8px 0 20px;
   flex-wrap: wrap;
+}
+
+.market-subnav {
+  margin-bottom: 28px;
 }
 
 .subnav-btn {

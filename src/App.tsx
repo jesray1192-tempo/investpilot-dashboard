@@ -23,6 +23,8 @@ type NavKey =
   | "us";
 
 type AiTabKey = "multimodal" | "strategy";
+type MarketTabKey = "heat" | "turnover" | "seal" | "winners";
+type InsightTabKey = "sectors" | "funds" | "ai";
 
 interface NavItem {
   key: NavKey;
@@ -115,6 +117,8 @@ function PlaceholderSection({
 export default function App() {
   const [activeNav, setActiveNav] = useState<NavKey>("home");
   const [activeAiTab, setActiveAiTab] = useState<AiTabKey>("multimodal");
+  const [activeMarketTab, setActiveMarketTab] = useState<MarketTabKey>("heat");
+  const [activeInsightTab, setActiveInsightTab] = useState<InsightTabKey>("sectors");
   const [portfolio] = useState(holdings);
   const marketValue = useMemo(() => totalMarketValue(portfolio), [portfolio]);
   const costValue = useMemo(() => totalCostValue(portfolio), [portfolio]);
@@ -200,171 +204,208 @@ export default function App() {
             </section>
 
             <section className="overview-grid">
-              <article className="card metric-card heat-card">
+              <article className="card wide metric-card market-tabs-card">
                 <div className="card-head">
                   <div>
-                    <p className="section-kicker">Heat</p>
-                    <h2>市场热度</h2>
+                    <p className="section-kicker">Pulse Board</p>
+                    <h2>市场热度与情绪指标</h2>
                   </div>
                 </div>
-                <div className="gauge">
-                  <div className="gauge-ring">
-                    <div className="gauge-value">{marketBreadth.heat.toFixed(1)}°</div>
-                  </div>
+                <div className="subnav-row market-subnav">
+                  <button
+                    type="button"
+                    className={`subnav-btn ${activeMarketTab === "heat" ? "active" : ""}`}
+                    onClick={() => setActiveMarketTab("heat")}
+                  >
+                    市场热度
+                  </button>
+                  <button
+                    type="button"
+                    className={`subnav-btn ${activeMarketTab === "turnover" ? "active" : ""}`}
+                    onClick={() => setActiveMarketTab("turnover")}
+                  >
+                    成交额
+                  </button>
+                  <button
+                    type="button"
+                    className={`subnav-btn ${activeMarketTab === "seal" ? "active" : ""}`}
+                    onClick={() => setActiveMarketTab("seal")}
+                  >
+                    封板率
+                  </button>
+                  <button
+                    type="button"
+                    className={`subnav-btn ${activeMarketTab === "winners" ? "active" : ""}`}
+                    onClick={() => setActiveMarketTab("winners")}
+                  >
+                    昨涨停今表现
+                  </button>
                 </div>
-                <div className="duel-line">
-                  <strong className="up">涨停 {marketBreadth.limitUp}</strong>
-                  <span>VS</span>
-                  <strong className="down">开板 {marketBreadth.openBoard}</strong>
-                </div>
-              </article>
 
-              <article className="card metric-card">
-                <div className="card-head">
-                  <div>
-                    <p className="section-kicker">Turnover</p>
-                    <h2>成交额</h2>
-                  </div>
-                </div>
-                <div className="big-metric">{marketBreadth.turnover}</div>
-                <div className="dual-metrics">
-                  <div>
-                    <span>较上日</span>
-                    <strong className="up">{marketBreadth.turnoverDelta}</strong>
-                  </div>
-                  <div>
-                    <span>波动风险分</span>
-                    <strong>{riskScore}/100</strong>
-                  </div>
-                </div>
-              </article>
+                {activeMarketTab === "heat" && (
+                  <>
+                    <div className="gauge">
+                      <div className="gauge-ring">
+                        <div className="gauge-value">{marketBreadth.heat.toFixed(1)}°</div>
+                      </div>
+                    </div>
+                    <div className="duel-line">
+                      <strong className="up">涨停 {marketBreadth.limitUp}</strong>
+                      <span>VS</span>
+                      <strong className="down">开板 {marketBreadth.openBoard}</strong>
+                    </div>
+                  </>
+                )}
 
-              <article className="card metric-card">
-                <div className="card-head">
-                  <div>
-                    <p className="section-kicker">Seal Rate</p>
-                    <h2>封板率</h2>
-                  </div>
-                </div>
-                <div className="big-metric up">{marketBreadth.sealRate.toFixed(2)}%</div>
-                <div className="dual-metrics">
-                  <div>
-                    <span>封板</span>
-                    <strong>{marketBreadth.limitUp}</strong>
-                  </div>
-                  <div>
-                    <span>触及开板</span>
-                    <strong>{marketBreadth.openBoard}</strong>
-                  </div>
-                </div>
-              </article>
+                {activeMarketTab === "turnover" && (
+                  <>
+                    <div className="big-metric">{marketBreadth.turnover}</div>
+                    <div className="dual-metrics">
+                      <div>
+                        <span>较上日</span>
+                        <strong className="up">{marketBreadth.turnoverDelta}</strong>
+                      </div>
+                      <div>
+                        <span>波动风险分</span>
+                        <strong>{riskScore}/100</strong>
+                      </div>
+                    </div>
+                  </>
+                )}
 
-              <article className="card metric-card">
-                <div className="card-head">
-                  <div>
-                    <p className="section-kicker">Yesterday Winners</p>
-                    <h2>昨涨停今表现</h2>
-                  </div>
-                </div>
-                <div className="big-metric up">
-                  {marketBreadth.yesterdayLimitUpReturn.toFixed(2)}%
-                </div>
-                <div className="dual-metrics">
-                  <div>
-                    <span>高开率</span>
-                    <strong>{marketBreadth.highOpenRate}%</strong>
-                  </div>
-                  <div>
-                    <span>获利率</span>
-                    <strong>{marketBreadth.profitRate}%</strong>
-                  </div>
-                </div>
+                {activeMarketTab === "seal" && (
+                  <>
+                    <div className="big-metric up">{marketBreadth.sealRate.toFixed(2)}%</div>
+                    <div className="dual-metrics">
+                      <div>
+                        <span>封板</span>
+                        <strong>{marketBreadth.limitUp}</strong>
+                      </div>
+                      <div>
+                        <span>触及开板</span>
+                        <strong>{marketBreadth.openBoard}</strong>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {activeMarketTab === "winners" && (
+                  <>
+                    <div className="big-metric up">
+                      {marketBreadth.yesterdayLimitUpReturn.toFixed(2)}%
+                    </div>
+                    <div className="dual-metrics">
+                      <div>
+                        <span>高开率</span>
+                        <strong>{marketBreadth.highOpenRate}%</strong>
+                      </div>
+                      <div>
+                        <span>获利率</span>
+                        <strong>{marketBreadth.profitRate}%</strong>
+                      </div>
+                    </div>
+                  </>
+                )}
               </article>
             </section>
 
             <section className="dashboard-grid">
-              <article className="card wide">
+              <article className="card wide market-tabs-card">
                 <div className="card-head">
                   <div>
-                    <p className="section-kicker">Sectors</p>
-                    <h2>当日板块</h2>
+                    <p className="section-kicker">Insight Deck</p>
+                    <h2>板块与 AI 结论</h2>
                   </div>
                 </div>
-                <div className="board-list">
-                  {sectorBoards.map((board) => (
-                    <div className="board-item" key={board.name}>
-                      <div>
-                        <strong>{board.name}</strong>
-                        <p>龙头：{board.leader}</p>
-                      </div>
-                      <div className="board-side">
-                        <span className={board.change >= 0 ? "up" : "down"}>
-                          {percent(board.change)}
-                        </span>
-                        <p>{board.note}</p>
-                      </div>
-                    </div>
-                  ))}
+                <div className="subnav-row market-subnav">
+                  <button
+                    type="button"
+                    className={`subnav-btn ${activeInsightTab === "sectors" ? "active" : ""}`}
+                    onClick={() => setActiveInsightTab("sectors")}
+                  >
+                    当日板块
+                  </button>
+                  <button
+                    type="button"
+                    className={`subnav-btn ${activeInsightTab === "funds" ? "active" : ""}`}
+                    onClick={() => setActiveInsightTab("funds")}
+                  >
+                    资金板块
+                  </button>
+                  <button
+                    type="button"
+                    className={`subnav-btn ${activeInsightTab === "ai" ? "active" : ""}`}
+                    onClick={() => setActiveInsightTab("ai")}
+                  >
+                    AI盘面结论
+                  </button>
                 </div>
-              </article>
 
-              <article className="card">
-                <div className="card-head">
-                  <div>
-                    <p className="section-kicker">AI</p>
-                    <h2>盘面结论</h2>
+                {activeInsightTab === "sectors" && (
+                  <div className="board-list">
+                    {sectorBoards.map((board) => (
+                      <div className="board-item" key={board.name}>
+                        <div>
+                          <strong>{board.name}</strong>
+                          <p>龙头：{board.leader}</p>
+                        </div>
+                        <div className="board-side">
+                          <span className={board.change >= 0 ? "up" : "down"}>
+                            {percent(board.change)}
+                          </span>
+                          <p>{board.note}</p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                </div>
-                <div className="ai-brief">
-                  <p>{aiSummary(portfolio)}</p>
-                  <div className="hero-grid compact-grid">
-                    <div>
-                      <strong>{currency(marketValue)}</strong>
-                      <span>持仓市值</span>
-                    </div>
-                    <div>
-                      <strong>{percent(pnlPercent)}</strong>
-                      <span>累计收益</span>
-                    </div>
-                    <div>
-                      <strong>{bestHolding.name}</strong>
-                      <span>今日相对强势</span>
-                    </div>
-                    <div>
-                      <strong>{dataSources.length}</strong>
-                      <span>数据源预留</span>
-                    </div>
-                  </div>
-                </div>
-              </article>
+                )}
 
-              <article className="card wide">
-                <div className="card-head">
-                  <div>
-                    <p className="section-kicker">Fund Flow</p>
-                    <h2>资金板块</h2>
-                  </div>
-                </div>
-                <div className="board-list">
-                  {fundFlowBoards.map((board) => (
-                    <div className="board-item" key={board.name}>
-                      <div>
-                        <strong>{board.name}</strong>
-                        <p>{board.note}</p>
+                {activeInsightTab === "funds" && (
+                  <div className="board-list">
+                    {fundFlowBoards.map((board) => (
+                      <div className="board-item" key={board.name}>
+                        <div>
+                          <strong>{board.name}</strong>
+                          <p>{board.note}</p>
+                        </div>
+                        <div className="board-side">
+                          <span className={board.strength}>{board.inflow}</span>
+                          <p>
+                            {board.strength === "strong"
+                              ? "主力净流入"
+                              : board.strength === "weak"
+                                ? "主力净流出"
+                                : "观察中"}
+                          </p>
+                        </div>
                       </div>
-                      <div className="board-side">
-                        <span className={board.strength}>{board.inflow}</span>
-                        <p>
-                          {board.strength === "strong"
-                            ? "主力净流入"
-                            : board.strength === "weak"
-                              ? "主力净流出"
-                              : "观察中"}
-                        </p>
+                    ))}
+                  </div>
+                )}
+
+                {activeInsightTab === "ai" && (
+                  <div className="ai-brief">
+                    <p>{aiSummary(portfolio)}</p>
+                    <div className="hero-grid compact-grid">
+                      <div>
+                        <strong>{currency(marketValue)}</strong>
+                        <span>持仓市值</span>
+                      </div>
+                      <div>
+                        <strong>{percent(pnlPercent)}</strong>
+                        <span>累计收益</span>
+                      </div>
+                      <div>
+                        <strong>{bestHolding.name}</strong>
+                        <span>今日相对强势</span>
+                      </div>
+                      <div>
+                        <strong>{dataSources.length}</strong>
+                        <span>数据源预留</span>
                       </div>
                     </div>
-                  ))}
-                </div>
+                  </div>
+                )}
               </article>
 
               <article className="card wide">
