@@ -3,6 +3,7 @@ import {
   dataSources,
   fundFlowBoards,
   holdings,
+  limitUpStocks,
   marketBreadth,
   marketEvents,
   marketIndices,
@@ -23,7 +24,7 @@ type NavKey =
   | "us";
 
 type AiTabKey = "multimodal" | "strategy";
-type MarketTabKey = "heat" | "turnover" | "seal" | "winners";
+type MarketTabKey = "heat" | "turnover" | "seal" | "winners" | "limitup";
 type InsightTabKey = "sectors" | "funds" | "ai";
 type PortfolioTabKey = "holdings" | "trades";
 
@@ -305,6 +306,13 @@ export default function App() {
                   >
                     昨涨停今表现
                   </button>
+                  <button
+                    type="button"
+                    className={`subnav-btn ${activeMarketTab === "limitup" ? "active" : ""}`}
+                    onClick={() => setActiveMarketTab("limitup")}
+                  >
+                    涨停板
+                  </button>
                 </div>
 
                 {activeMarketTab === "heat" && (
@@ -370,6 +378,30 @@ export default function App() {
                       </div>
                     </div>
                   </>
+                )}
+
+                {activeMarketTab === "limitup" && (
+                  <div className="limitup-table">
+                    <div className="limitup-head">
+                      <span>股票</span>
+                      <span>价格</span>
+                      <span>涨停次数</span>
+                      <span>涨停原因</span>
+                      <span>股票行业</span>
+                    </div>
+                    {limitUpStocks.map((stock) => (
+                      <div className="limitup-row" key={stock.code}>
+                        <span>
+                          <strong>{stock.name}</strong>
+                          <small>{stock.code}</small>
+                        </span>
+                        <span>{currency(stock.price)}</span>
+                        <span>{stock.limitUpCount} 次</span>
+                        <span>{stock.reason}</span>
+                        <span>{stock.industry}</span>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </article>
             </section>
