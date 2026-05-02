@@ -1,4 +1,87 @@
-import { DataSource, Holding, MarketEvent, Signal } from "../types";
+import {
+  DataSource,
+  FundFlowBoard,
+  Holding,
+  MarketBreadth,
+  MarketEvent,
+  MarketIndex,
+  SectorBoard,
+  Signal
+} from "../types";
+
+export const marketIndices: MarketIndex[] = [
+  { name: "上证指数", value: 3112.48, change: 0.38 },
+  { name: "深证成指", value: 9574.22, change: -0.21 },
+  { name: "创业板指", value: 1842.17, change: -0.46 },
+  { name: "沪深300", value: 3611.53, change: 0.14 },
+  { name: "中证500", value: 5291.86, change: 0.62 }
+];
+
+export const marketBreadth: MarketBreadth = {
+  heat: 48,
+  turnover: "8742亿",
+  turnoverDelta: "+516亿",
+  limitUp: 79,
+  openBoard: 14,
+  sealRate: 85,
+  yesterdayLimitUpReturn: 2.81,
+  highOpenRate: 81,
+  profitRate: 61
+};
+
+export const sectorBoards: SectorBoard[] = [
+  {
+    name: "低空经济",
+    change: 4.82,
+    leader: "万丰奥威",
+    note: "政策预期强化，核心票维持强趋势。"
+  },
+  {
+    name: "机器人",
+    change: 3.94,
+    leader: "鸣志电器",
+    note: "早盘资金回流，减速器与执行器方向最强。"
+  },
+  {
+    name: "铜缆高速连接",
+    change: 2.76,
+    leader: "沃尔核材",
+    note: "算力链分支活跃，容量票承接较好。"
+  },
+  {
+    name: "创新药",
+    change: -1.24,
+    leader: "百利天恒",
+    note: "高位震荡，板块内部开始分化。"
+  }
+];
+
+export const fundFlowBoards: FundFlowBoard[] = [
+  {
+    name: "证券",
+    inflow: "+18.6亿",
+    strength: "strong",
+    note: "指数稳盘方向，权重资金明显回流。"
+  },
+  {
+    name: "汽车零部件",
+    inflow: "+12.3亿",
+    strength: "strong",
+    note: "趋势加速，机构与游资共振。"
+  },
+  {
+    name: "光伏设备",
+    inflow: "-6.8亿",
+    strength: "weak",
+    note: "高开低走，短线兑现压力偏大。"
+  },
+  {
+    name: "消费电子",
+    inflow: "+4.1亿",
+    strength: "watch",
+    note: "修复中继，持续性仍需观察。"
+  }
+];
 
 export const dataSources: DataSource[] = [
   {

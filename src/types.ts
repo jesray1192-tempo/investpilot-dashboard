@@ -32,3 +32,35 @@ export interface MarketEvent {
   title: string;
   impact: "bullish" | "neutral" | "bearish";
 }
+
+export interface MarketIndex {
+  name: string;
+  value: number;
+  change: number;
+}
+
+export interface MarketBreadth {
+  heat: number;
+  turnover: string;
+  turnoverDelta: string;
+  limitUp: number;
+  openBoard: number;
+  sealRate: number;
+  yesterdayLimitUpReturn: number;
+  highOpenRate: number;
+  profitRate: number;
+}
+
+export interface SectorBoard {
+  name: string;
+  change: number;
+  leader: string;
+  note: string;
+}
+
+export interface FundFlowBoard {
+  name: string;
+  inflow: string;
+  strength: "strong" | "watch" | "weak";
+  note: string;
+}
