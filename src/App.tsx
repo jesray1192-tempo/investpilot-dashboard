@@ -7,7 +7,9 @@ import {
   marketEvents,
   marketIndices,
   riskSignals,
-  sectorBoards
+  sectorBoards,
+  thesisRecords,
+  tradeRecords
 } from "./data/mock";
 import { Holding } from "./types";
 
@@ -129,6 +131,11 @@ export default function App() {
   }, [portfolio]);
 
   const currentNav = navItems.find((item) => item.key === activeNav) ?? navItems[0];
+  const investedRatio = Math.round((marketValue / (marketValue + 185000)) * 100);
+  const dailyPnl = portfolio.reduce(
+    (sum, item) => sum + item.shares * item.price * (item.dailyChange / 100),
+    0
+  );
 
   return (
     <main className="app-shell app-layout">
@@ -475,11 +482,225 @@ export default function App() {
         )}
 
         {activeNav === "portfolio" && (
-          <PlaceholderSection
-            title="我的持仓"
-            summary="这里会独立展示你的股票持仓、盈亏曲线、交易记录、关注理由和仓位变动。"
-            bullets={["持仓总览", "交易记录", "仓位分析", "个股观察"]}
-          />
+          <section className="portfolio-view">
+            <section className="overview-grid">
+              <article className="card metric-card">
+                <div className="card-head">
+                  <div>
+                    <p className="section-kicker">Portfolio Value</p>
+                    <h2>持仓总市值</h2>
+                  </div>
+                </div>
+                <div className="big-metric">{currency(marketValue)}</div>
+                <div className="dual-metrics">
+                  <div>
+                    <span>累计盈亏</span>
+                    <strong className={pnl >= 0 ? "up" : "down"}>{currency(pnl)}</strong>
+                  </div>
+                  <div>
+                    <span>累计收益率</span>
+                    <strong className={pnlPercent >= 0 ? "up" : "down"}>
+                      {percent(pnlPercent)}
+                    </strong>
+                  </div>
+                </div>
+              </article>
+
+              <article className="card metric-card">
+                <div className="card-head">
+                  <div>
+                    <p className="section-kicker">Daily</p>
+                    <h2>当日盈亏</h2>
+                  </div>
+                </div>
+                <div className={`big-metric ${dailyPnl >= 0 ? "up" : "down"}`}>
+                  {currency(dailyPnl)}
+                </div>
+                <div className="dual-metrics">
+                  <div>
+                    <span>强势个股</span>
+                    <strong>{bestHolding.name}</strong>
+                  </div>
+                  <div>
+                    <span>波动风险</span>
+                    <strong>{riskScore}/100</strong>
+                  </div>
+                </div>
+              </article>
+
+              <article className="card metric-card">
+                <div className="card-head">
+                  <div>
+                    <p className="section-kicker">Allocation</p>
+                    <h2>仓位使用率</h2>
+                  </div>
+                </div>
+                <div className="big-metric">{investedRatio}%</div>
+                <div className="dual-metrics">
+                  <div>
+                    <span>现金估算</span>
+                    <strong>{currency(185000)}</strong>
+                  </div>
+                  <div>
+                    <span>核心仓占比</span>
+                    <strong>58%</strong>
+                  </div>
+                </div>
+              </article>
+
+              <article className="card metric-card">
+                <div className="card-head">
+                  <div>
+                    <p className="section-kicker">Discipline</p>
+                    <h2>纪律执行</h2>
+                  </div>
+                </div>
+                <div className="big-metric up">3 / 4</div>
+                <div className="dual-metrics">
+                  <div>
+                    <span>目标价覆盖</span>
+                    <strong>100%</strong>
+                  </div>
+                  <div>
+                    <span>止损线覆盖</span>
+                    <strong>100%</strong>
+                  </div>
+                </div>
+              </article>
+            </section>
+
+            <section className="dashboard-grid">
+              <article className="card wide">
+                <div className="card-head">
+                  <div>
+                    <p className="section-kicker">Holdings</p>
+                    <h2>持仓列表</h2>
+                  </div>
+                </div>
+                <div className="position-table">
+                  <div className="table-head">
+                    <span>股票</span>
+                    <span>持仓股数</span>
+                    <span>成本价</span>
+                    <span>现价</span>
+                    <span>总盈亏</span>
+                    <span>收益率</span>
+                    <span>纪律</span>
+                  </div>
+                  {portfolio.map((item) => {
+                    const currentValue = item.shares * item.price;
+                    const currentCost = item.shares * item.cost;
+                    const totalPnl = currentValue - currentCost;
+                    const returnRate = (totalPnl / currentCost) * 100;
+
+                    return (
+                      <div className="table-row" key={item.code}>
+                        <span>
+                          <strong>{item.name}</strong>
+                          <small>{item.code}</small>
+                        </span>
+                        <span>{item.shares}</span>
+                        <span>{currency(item.cost)}</span>
+                        <span>{currency(item.price)}</span>
+                        <span className={totalPnl >= 0 ? "up" : "down"}>
+                          {currency(totalPnl)}
+                        </span>
+                        <span className={returnRate >= 0 ? "up" : "down"}>
+                          {percent(returnRate)}
+                        </span>
+                        <span>
+                          目标 {item.targetPrice} / 止损 {item.stopLoss}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </article>
+
+              <article className="card">
+                <div className="card-head">
+                  <div>
+                    <p className="section-kicker">Risk</p>
+                    <h2>风险提示</h2>
+                  </div>
+                </div>
+                <div className="signal-list">
+                  {riskSignals.map((signal) => (
+                    <div className="signal-item" key={signal.title}>
+                      <span className={`signal-level ${signal.level}`}>{signal.level}</span>
+                      <div>
+                        <strong>{signal.title}</strong>
+                        <p>{signal.detail}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </article>
+
+              <article className="card wide">
+                <div className="card-head">
+                  <div>
+                    <p className="section-kicker">Trades</p>
+                    <h2>交易记录</h2>
+                  </div>
+                </div>
+                <div className="trade-list">
+                  {tradeRecords.map((trade) => (
+                    <div className="trade-item" key={trade.id}>
+                      <div>
+                        <strong>
+                          {trade.action === "buy" ? "买入" : "卖出"} {trade.name}
+                        </strong>
+                        <p>
+                          {trade.date} · {trade.code}
+                        </p>
+                      </div>
+                      <div className="trade-side">
+                        <span className={trade.action === "buy" ? "up" : "down"}>
+                          {trade.action === "buy" ? "+" : "-"}
+                          {trade.shares} 股
+                        </span>
+                        <p>
+                          成交价 {currency(trade.price)} · {trade.note}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </article>
+
+              <article className="card wide">
+                <div className="card-head">
+                  <div>
+                    <p className="section-kicker">Thesis</p>
+                    <h2>投资逻辑</h2>
+                  </div>
+                </div>
+                <div className="thesis-list">
+                  {thesisRecords.map((record) => (
+                    <div className="thesis-item" key={record.code}>
+                      <div className="thesis-title">
+                        <strong>{record.title}</strong>
+                        <span>{record.code}</span>
+                      </div>
+                      <p>
+                        <strong>为什么买：</strong>
+                        {record.reason}
+                      </p>
+                      <p>
+                        <strong>继续观察：</strong>
+                        {record.trigger}
+                      </p>
+                      <p>
+                        <strong>什么情况下卖：</strong>
+                        {record.exitRule}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </article>
+            </section>
+          </section>
         )}
 
         {activeNav === "ai" && (

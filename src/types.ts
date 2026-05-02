@@ -18,6 +18,9 @@ export interface Holding {
   dailyChange: number;
   thesis: string;
   tags: string[];
+  targetPrice?: number;
+  stopLoss?: number;
+  weight?: number;
 }
 
 export interface Signal {
@@ -63,4 +66,23 @@ export interface FundFlowBoard {
   inflow: string;
   strength: "strong" | "watch" | "weak";
   note: string;
+}
+
+export interface TradeRecord {
+  id: string;
+  date: string;
+  action: "buy" | "sell";
+  code: string;
+  name: string;
+  price: number;
+  shares: number;
+  note: string;
+}
+
+export interface ThesisRecord {
+  code: string;
+  title: string;
+  reason: string;
+  trigger: string;
+  exitRule: string;
 }

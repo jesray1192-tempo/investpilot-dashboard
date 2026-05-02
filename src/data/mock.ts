@@ -119,7 +119,10 @@ export const holdings: Holding[] = [
     price: 1726.5,
     dailyChange: 1.32,
     thesis: "高端白酒龙头，现金流稳定，适合作为组合压舱石。",
-    tags: ["消费", "高股息", "核心仓位"]
+    tags: ["消费", "高股息", "核心仓位"],
+    targetPrice: 1850,
+    stopLoss: 1600,
+    weight: 36
   },
   {
     code: "300750",
@@ -129,7 +132,10 @@ export const holdings: Holding[] = [
     price: 186.2,
     dailyChange: -2.84,
     thesis: "新能源链核心资产，但波动高，需要跟踪产能利用率和海外订单。",
-    tags: ["新能源", "成长", "高波动"]
+    tags: ["新能源", "成长", "高波动"],
+    targetPrice: 220,
+    stopLoss: 176,
+    weight: 22
   },
   {
     code: "601899",
@@ -139,7 +145,67 @@ export const holdings: Holding[] = [
     price: 17.08,
     dailyChange: 0.76,
     thesis: "铜金周期共振，受商品价格和海外项目进度驱动。",
-    tags: ["资源", "周期", "卫星仓位"]
+    tags: ["资源", "周期", "卫星仓位"],
+    targetPrice: 18.6,
+    stopLoss: 14.2,
+    weight: 18
+  }
+];
+
+export const tradeRecords = [
+  {
+    id: "tr-001",
+    date: "2026-04-28",
+    action: "buy",
+    code: "601899",
+    name: "紫金矿业",
+    price: 16.38,
+    shares: 800,
+    note: "加仓商品主线，博弈铜价趋势延续。"
+  },
+  {
+    id: "tr-002",
+    date: "2026-04-25",
+    action: "buy",
+    code: "600519",
+    name: "贵州茅台",
+    price: 1692,
+    shares: 40,
+    note: "年报后估值回落，补核心仓。"
+  },
+  {
+    id: "tr-003",
+    date: "2026-04-19",
+    action: "sell",
+    code: "300750",
+    name: "宁德时代",
+    price: 201.5,
+    shares: 100,
+    note: "减仓控制波动敞口。"
+  }
+];
+
+export const thesisRecords = [
+  {
+    code: "600519",
+    title: "防御核心仓",
+    reason: "消费龙头现金流稳定，适合作为组合净值稳定器。",
+    trigger: "白酒板块估值回落且北向资金重新流入时继续关注。",
+    exitRule: "若高端消费数据连续走弱或跌破 1600，降低仓位。"
+  },
+  {
+    code: "300750",
+    title: "成长弹性仓",
+    reason: "新能源链核心资产，适合用来承接赛道反弹和机构回流。",
+    trigger: "关注海外订单、储能出货和产能利用率改善。",
+    exitRule: "若跌破 176 或基本面预期继续下修，进一步减仓。"
+  },
+  {
+    code: "601899",
+    title: "资源顺周期仓",
+    reason: "铜金价格共振，兼具资源防御和弹性。",
+    trigger: "铜价维持强势、海外项目推进顺利时保持持有。",
+    exitRule: "若商品价格转弱并失守 14.2，切回观察仓位。"
   }
 ];
 
