@@ -73,6 +73,9 @@ export interface LimitUpStock {
   name: string;
   price: number;
   limitUpCount: number;
+  openBoardCount: number;
+  sealAmount: string;
+  ladderType: "首板" | "连板";
   reason: string;
   industry: string;
 }

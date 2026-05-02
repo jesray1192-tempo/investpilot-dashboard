@@ -90,6 +90,9 @@ export const limitUpStocks: LimitUpStock[] = [
     name: "万丰奥威",
     price: 17.62,
     limitUpCount: 2,
+    openBoardCount: 1,
+    sealAmount: "3.8亿",
+    ladderType: "连板",
     reason: "低空经济与飞行汽车概念持续发酵",
     industry: "汽车零部件"
   },
@@ -98,6 +101,9 @@ export const limitUpStocks: LimitUpStock[] = [
     name: "鸣志电器",
     price: 58.41,
     limitUpCount: 1,
+    openBoardCount: 0,
+    sealAmount: "1.6亿",
+    ladderType: "首板",
     reason: "机器人执行器方向资金回流",
     industry: "自动化设备"
   },
@@ -106,6 +112,9 @@ export const limitUpStocks: LimitUpStock[] = [
     name: "沃尔核材",
     price: 22.36,
     limitUpCount: 1,
+    openBoardCount: 2,
+    sealAmount: "2.1亿",
+    ladderType: "首板",
     reason: "铜缆高速连接题材活跃",
     industry: "通信设备"
   },
@@ -114,6 +123,9 @@ export const limitUpStocks: LimitUpStock[] = [
     name: "赛力斯",
     price: 97.15,
     limitUpCount: 3,
+    openBoardCount: 0,
+    sealAmount: "5.2亿",
+    ladderType: "连板",
     reason: "智能汽车主线强化，龙头情绪溢价明显",
     industry: "乘用车"
   }
