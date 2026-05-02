@@ -411,65 +411,21 @@ export default function App() {
               <article className="card wide">
                 <div className="card-head">
                   <div>
-                    <p className="section-kicker">Portfolio</p>
-                    <h2>我的持仓</h2>
-                  </div>
-                  <div className={`pill ${pnl >= 0 ? "positive" : "negative"}`}>
-                    浮动盈亏 {currency(pnl)}
+                    <p className="section-kicker">Connectors</p>
+                    <h2>数据接入与后续建设</h2>
                   </div>
                 </div>
-                <div className="holdings-list">
-                  {portfolio.map((item) => {
-                    const value = item.shares * item.price;
-                    const cost = item.shares * item.cost;
-                    const itemPnl = value - cost;
-
-                    return (
-                      <div className="holding-row" key={item.code}>
-                        <div>
-                          <strong>
-                            {item.name} <span>{item.code}</span>
-                          </strong>
-                          <p>{item.thesis}</p>
-                          <div className="tag-row">
-                            {item.tags.map((tag) => (
-                              <span className="tag" key={tag}>
-                                {tag}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                        <div className="holding-metrics">
-                          <span>仓位市值 {currency(value)}</span>
-                          <span>持仓成本 {currency(cost)}</span>
-                          <span>现价 {currency(item.price)}</span>
-                          <span className={item.dailyChange >= 0 ? "up" : "down"}>
-                            日内 {percent(item.dailyChange)}
-                          </span>
-                          <span className={itemPnl >= 0 ? "up" : "down"}>
-                            总盈亏 {currency(itemPnl)}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </article>
-
-              <article className="card">
-                <div className="card-head">
-                  <div>
-                    <p className="section-kicker">Signals</p>
-                    <h2>AI 风险雷达</h2>
-                  </div>
-                </div>
-                <div className="signal-list">
-                  {riskSignals.map((signal) => (
-                    <div className="signal-item" key={signal.title}>
-                      <span className={`signal-level ${signal.level}`}>{signal.level}</span>
+                <div className="source-list">
+                  {dataSources.map((source) => (
+                    <div className="source-item" key={source.id}>
                       <div>
-                        <strong>{signal.title}</strong>
-                        <p>{signal.detail}</p>
+                        <strong>{source.name}</strong>
+                        <p>{source.channel}</p>
+                      </div>
+                      <div className="source-meta">
+                        <span className={`status ${source.status}`}>{source.status}</span>
+                        <span>{source.coverage}</span>
+                        <span>{source.notes}</span>
                       </div>
                     </div>
                   ))}
@@ -498,29 +454,6 @@ export default function App() {
                 </div>
               </article>
 
-              <article className="card wide">
-                <div className="card-head">
-                  <div>
-                    <p className="section-kicker">Connectors</p>
-                    <h2>数据接入与后续建设</h2>
-                  </div>
-                </div>
-                <div className="source-list">
-                  {dataSources.map((source) => (
-                    <div className="source-item" key={source.id}>
-                      <div>
-                        <strong>{source.name}</strong>
-                        <p>{source.channel}</p>
-                      </div>
-                      <div className="source-meta">
-                        <span className={`status ${source.status}`}>{source.status}</span>
-                        <span>{source.coverage}</span>
-                        <span>{source.notes}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </article>
             </section>
           </>
         )}
