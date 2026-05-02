@@ -183,6 +183,30 @@ export default function App() {
 
         {activeNav === "home" && (
           <>
+            <section className="home-top-feed">
+              <article className="card wide">
+                <div className="card-head">
+                  <div>
+                    <p className="section-kicker">Feeds</p>
+                    <h2>事件与快讯</h2>
+                  </div>
+                </div>
+                <div className="event-list">
+                  {marketEvents.map((event) => (
+                    <div className="event-item" key={`${event.time}-${event.title}`}>
+                      <div className={`impact-dot ${event.impact}`} />
+                      <div>
+                        <strong>{event.title}</strong>
+                        <p>
+                          {event.time} · {event.source}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </article>
+            </section>
+
             <section className="market-strip card">
               <div className="market-strip-head">
                 <p className="section-kicker">Market Pulse</p>
@@ -426,28 +450,6 @@ export default function App() {
                         <span className={`status ${source.status}`}>{source.status}</span>
                         <span>{source.coverage}</span>
                         <span>{source.notes}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </article>
-
-              <article className="card">
-                <div className="card-head">
-                  <div>
-                    <p className="section-kicker">Feeds</p>
-                    <h2>事件与快讯</h2>
-                  </div>
-                </div>
-                <div className="event-list">
-                  {marketEvents.map((event) => (
-                    <div className="event-item" key={`${event.time}-${event.title}`}>
-                      <div className={`impact-dot ${event.impact}`} />
-                      <div>
-                        <strong>{event.title}</strong>
-                        <p>
-                          {event.time} · {event.source}
-                        </p>
                       </div>
                     </div>
                   ))}
