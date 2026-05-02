@@ -656,6 +656,7 @@ export default function App() {
                       <span>总盈亏</span>
                       <span>收益率</span>
                       <span>纪律</span>
+                      <span>买入逻辑</span>
                     </div>
                     {portfolio.map((item) => {
                       const currentValue = item.shares * item.price;
@@ -665,31 +666,24 @@ export default function App() {
                       const thesis = thesisRecords.find((record) => record.code === item.code);
 
                       return (
-                        <div className="holding-detail-card" key={item.code}>
-                          <div className="table-row">
-                            <span>
-                              <strong>{item.name}</strong>
-                              <small>{item.code}</small>
-                            </span>
-                            <span>{item.shares}</span>
-                            <span>{currency(item.cost)}</span>
-                            <span>{currency(item.price)}</span>
-                            <span className={totalPnl >= 0 ? "up" : "down"}>
-                              {currency(totalPnl)}
-                            </span>
-                            <span className={returnRate >= 0 ? "up" : "down"}>
-                              {percent(returnRate)}
-                            </span>
-                            <span>
-                              目标 {item.targetPrice} / 止损 {item.stopLoss}
-                            </span>
-                          </div>
-                          {thesis && (
-                            <div className="buy-thesis-inline">
-                              <span className="buy-thesis-label">买入逻辑</span>
-                              <p>{thesis.reason}</p>
-                            </div>
-                          )}
+                        <div className="table-row wide-table-row" key={item.code}>
+                          <span>
+                            <strong>{item.name}</strong>
+                            <small>{item.code}</small>
+                          </span>
+                          <span>{item.shares}</span>
+                          <span>{currency(item.cost)}</span>
+                          <span>{currency(item.price)}</span>
+                          <span className={totalPnl >= 0 ? "up" : "down"}>
+                            {currency(totalPnl)}
+                          </span>
+                          <span className={returnRate >= 0 ? "up" : "down"}>
+                            {percent(returnRate)}
+                          </span>
+                          <span>
+                            目标 {item.targetPrice} / 止损 {item.stopLoss}
+                          </span>
+                          <span className="inline-thesis-cell">{thesis?.reason ?? item.thesis}</span>
                         </div>
                       );
                     })}
@@ -723,7 +717,7 @@ export default function App() {
                 )}
               </article>
 
-              <article className="card">
+              <article className="card wide">
                 <div className="card-head">
                   <div>
                     <p className="section-kicker">Risk</p>
