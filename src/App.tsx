@@ -185,6 +185,12 @@ export default function App() {
     (sum, item) => sum + item.shares * item.price * (item.dailyChange / 100),
     0
   );
+  const maxLimitUpHeight = Math.max(...limitUpStocks.map((stock) => stock.limitUpCount));
+  const totalOpenBoardCount = limitUpStocks.reduce((sum, stock) => sum + stock.openBoardCount, 0);
+  const firstBoardCount = limitUpStocks.filter((stock) => stock.ladderType === "首板").length;
+  const consecutiveBoardCount = limitUpStocks.filter(
+    (stock) => stock.ladderType === "连板"
+  ).length;
 
   return (
     <main className="app-shell app-layout">
@@ -382,10 +388,31 @@ export default function App() {
 
                 {activeMarketTab === "limitup" && (
                   <div className="limitup-table">
+                    <div className="limitup-summary-grid">
+                      <div className="limitup-summary-card">
+                        <span>连板高度</span>
+                        <strong>{maxLimitUpHeight} 板</strong>
+                      </div>
+                      <div className="limitup-summary-card">
+                        <span>开板次数</span>
+                        <strong>{totalOpenBoardCount} 次</strong>
+                      </div>
+                      <div className="limitup-summary-card">
+                        <span>首板家数</span>
+                        <strong>{firstBoardCount} 家</strong>
+                      </div>
+                      <div className="limitup-summary-card">
+                        <span>连板家数</span>
+                        <strong>{consecutiveBoardCount} 家</strong>
+                      </div>
+                    </div>
                     <div className="limitup-head">
                       <span>股票</span>
                       <span>价格</span>
                       <span>涨停次数</span>
+                      <span>开板次数</span>
+                      <span>封单额</span>
+                      <span>分类</span>
                       <span>涨停原因</span>
                       <span>股票行业</span>
                     </div>
@@ -397,6 +424,11 @@ export default function App() {
                         </span>
                         <span>{currency(stock.price)}</span>
                         <span>{stock.limitUpCount} 次</span>
+                        <span>{stock.openBoardCount} 次</span>
+                        <span>{stock.sealAmount}</span>
+                        <span className={stock.ladderType === "连板" ? "up" : "watch"}>
+                          {stock.ladderType}
+                        </span>
                         <span>{stock.reason}</span>
                         <span>{stock.industry}</span>
                       </div>
