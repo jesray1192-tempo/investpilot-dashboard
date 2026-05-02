@@ -27,6 +27,10 @@ type AiTabKey = "multimodal" | "strategy";
 type MarketTabKey = "heat" | "turnover" | "seal" | "winners" | "limitup";
 type InsightTabKey = "sectors" | "funds" | "ai";
 type PortfolioTabKey = "holdings" | "trades";
+type PolicyMaterial = {
+  name: string;
+  kind: string;
+};
 
 interface NavItem {
   key: NavKey;
@@ -155,12 +159,33 @@ function PlaceholderSection({
   );
 }
 
+function buildPolicyOutput(policyUrl: string, policyTheme: string, policyNote: string) {
+  const theme = policyTheme.trim() || "政策热点";
+  const source = policyUrl.trim() || "官方材料";
+  const note = policyNote.trim() || "当前没有额外备注，默认按政策主线做中性解读。";
+
+  return {
+    summary: `AI 识别到本次材料的核心主题是“${theme}”。来源为 ${source}，当前更偏向中期政策传导，而不是单日情绪扰动。`,
+    analysis: `从政策传导看，这类表述通常先影响预期，再影响订单、投资节奏和资金关注度。结合你的备注“${note}”，当前更值得观察政策落地速度、配套细则和市场是否已经提前交易。`,
+    strategy: `策略上优先跟踪与“${theme}”直接相关的行业龙头、弹性分支和低位补涨方向。若政策仍处在预期发酵阶段，宜先观察主线确认，再分批布局。`,
+    risk: `风险主要在三个地方：第一，政策口径偏原则性，细则未落地；第二，市场可能已经提前透支预期；第三，主题扩散过快时容易出现跟风误判。`
+  };
+}
+
 export default function App() {
   const [activeNav, setActiveNav] = useState<NavKey>("home");
   const [activeAiTab, setActiveAiTab] = useState<AiTabKey>("multimodal");
   const [activeMarketTab, setActiveMarketTab] = useState<MarketTabKey>("heat");
   const [activeInsightTab, setActiveInsightTab] = useState<InsightTabKey>("sectors");
   const [activePortfolioTab, setActivePortfolioTab] = useState<PortfolioTabKey>("holdings");
+  const [policyUrl, setPolicyUrl] = useState("https://www.gov.cn/yaowen/liebiao/202505/content_7024210.htm");
+  const [policyTheme, setPolicyTheme] = useState("十五五规划");
+  const [policyNote, setPolicyNote] = useState("重点看低空经济、自主可控和设备更新链条。");
+  const [policyMaterials] = useState<PolicyMaterial[]>([
+    { name: "中国政府网政策链接", kind: "网页链接" },
+    { name: "新闻联播截图摘要", kind: "图片材料" },
+    { name: "行业纪要补充说明", kind: "文本备注" }
+  ]);
   const [portfolio] = useState(holdings);
   const marketValue = useMemo(() => totalMarketValue(portfolio), [portfolio]);
   const costValue = useMemo(() => totalCostValue(portfolio), [portfolio]);
@@ -191,6 +216,10 @@ export default function App() {
   const consecutiveBoardCount = limitUpStocks.filter(
     (stock) => stock.ladderType === "连板"
   ).length;
+  const policyOutput = useMemo(
+    () => buildPolicyOutput(policyUrl, policyTheme, policyNote),
+    [policyUrl, policyTheme, policyNote]
+  );
 
   return (
     <main className="app-shell app-layout">
@@ -939,11 +968,48 @@ export default function App() {
                   <div className="upload-inline-grid">
                     <div className="upload-input-card">
                       <strong>政策链接或文章地址</strong>
-                      <div className="fake-input">粘贴中国政府网、外交部、央视网等官方页面地址</div>
+                      <input
+                        className="real-input"
+                        value={policyUrl}
+                        onChange={(event) => setPolicyUrl(event.target.value)}
+                        placeholder="粘贴中国政府网、外交部、央视网等官方页面地址"
+                      />
                     </div>
                     <div className="upload-input-card">
                       <strong>你的关注主题</strong>
-                      <div className="fake-input">例如：低空经济、算力、自主可控、外贸、国企改革</div>
+                      <input
+                        className="real-input"
+                        value={policyTheme}
+                        onChange={(event) => setPolicyTheme(event.target.value)}
+                        placeholder="例如：低空经济、算力、自主可控、外贸、国企改革"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="upload-input-card">
+                    <strong>补充说明 / 你的判断</strong>
+                    <textarea
+                      className="real-textarea"
+                      value={policyNote}
+                      onChange={(event) => setPolicyNote(event.target.value)}
+                      placeholder="写下你最关心的政策传导方向、怀疑点或想让 AI 重点判断的内容"
+                    />
+                  </div>
+
+                  <div className="material-list-card">
+                    <div className="card-head compact-head">
+                      <div>
+                        <p className="section-kicker">Imported</p>
+                        <h2>已导入材料</h2>
+                      </div>
+                    </div>
+                    <div className="material-list">
+                      {policyMaterials.map((material) => (
+                        <div className="material-item" key={`${material.kind}-${material.name}`}>
+                          <strong>{material.name}</strong>
+                          <span>{material.kind}</span>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -951,19 +1017,19 @@ export default function App() {
                 <div className="generated-grid">
                   <div className="placeholder-card">
                     <strong>政策要点摘要</strong>
-                    <p>自动提炼政策目标、关键词、执行路径、时间维度和涉及部门。</p>
+                    <p>{policyOutput.summary}</p>
                   </div>
                   <div className="placeholder-card">
                     <strong>热点影响分析</strong>
-                    <p>识别哪些主题会强化，哪些板块可能受压制，判断影响是短期情绪还是中期产业逻辑。</p>
+                    <p>{policyOutput.analysis}</p>
                   </div>
                   <div className="placeholder-card">
                     <strong>投资策略建议</strong>
-                    <p>输出优先跟踪方向、受益行业、可观察标的和适合的仓位节奏。</p>
+                    <p>{policyOutput.strategy}</p>
                   </div>
                   <div className="placeholder-card">
                     <strong>风险与偏差提醒</strong>
-                    <p>提示政策口径与市场解读的偏差、兑现周期过长、主题交易过热等风险。</p>
+                    <p>{policyOutput.risk}</p>
                   </div>
                 </div>
               </div>
