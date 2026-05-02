@@ -427,6 +427,69 @@ h2 {
   line-height: 1.6;
 }
 
+.multimodal-layout {
+  display: grid;
+  gap: 24px;
+}
+
+.upload-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.upload-dropzone {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01)),
+    rgba(255, 255, 255, 0.02);
+  border: 1px dashed rgba(99, 157, 255, 0.35);
+  border-radius: 24px;
+  padding: 24px;
+}
+
+.upload-dropzone strong,
+.upload-input-card strong {
+  display: block;
+  font-size: 1.35rem;
+  margin-bottom: 10px;
+}
+
+.upload-dropzone p,
+.upload-input-card p {
+  margin: 0 0 16px;
+  color: rgba(242, 239, 232, 0.72);
+  line-height: 1.6;
+}
+
+.upload-inline-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.upload-input-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 20px;
+  padding: 18px;
+}
+
+.fake-input {
+  min-height: 52px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.02);
+  padding: 15px 16px;
+  color: rgba(242, 239, 232, 0.5);
+  display: flex;
+  align-items: center;
+}
+
+.generated-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
 .subnav-row {
   display: flex;
   gap: 12px;
@@ -769,6 +832,11 @@ h2 {
   }
 
   .placeholder-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .upload-inline-grid,
+  .generated-grid {
     grid-template-columns: 1fr;
   }
 

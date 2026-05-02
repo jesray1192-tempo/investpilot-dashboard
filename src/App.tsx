@@ -728,28 +728,45 @@ export default function App() {
 
               {activeAiTab === "multimodal" && (
                 <>
-                  <p className="placeholder-summary">
-                    这个子页面用于上传视频、图片、研报、会议纪要、公告和截图，让 AI
-                    自动识别关键信息，提炼内容特点，并输出可执行的投资策略。
-                  </p>
-                  <div className="placeholder-grid">
-                    <div className="placeholder-card">
-                      <strong>上传视频 / 图片 / 文件</strong>
-                      <p>支持路演视频、新闻截图、研报 PDF、政策文件和财报材料。</p>
+                  <section className="multimodal-layout">
+                    <div className="upload-panel">
+                      <div className="upload-dropzone">
+                        <strong>上传视频 / 图片 / 文件</strong>
+                        <p>支持视频、截图、研报 PDF、会议纪要、政策文件、财报和各类文档。</p>
+                        <button type="button">选择本地文件</button>
+                      </div>
+
+                      <div className="upload-inline-grid">
+                        <div className="upload-input-card">
+                          <strong>视频地址 / 文章地址</strong>
+                          <div className="fake-input">粘贴视频链接、公众号文章链接、网页地址</div>
+                        </div>
+                        <div className="upload-input-card">
+                          <strong>截图补充说明</strong>
+                          <div className="fake-input">补充截图来源、时间、上下文和你的关注点</div>
+                        </div>
+                      </div>
                     </div>
-                    <div className="placeholder-card">
-                      <strong>自动总结特点</strong>
-                      <p>提炼核心观点、产业信号、情绪倾向、估值锚点和市场关注点。</p>
+
+                    <div className="generated-grid">
+                      <div className="placeholder-card">
+                        <strong>AI 识别特点</strong>
+                        <p>自动提炼内容主题、核心观点、产业信号、情绪倾向和市场关注点。</p>
+                      </div>
+                      <div className="placeholder-card">
+                        <strong>AI 深度分析</strong>
+                        <p>分析信息背后的逻辑链条、受益环节、证据强度和潜在催化路径。</p>
+                      </div>
+                      <div className="placeholder-card">
+                        <strong>投资策略</strong>
+                        <p>输出受益方向、利空方向、可跟踪标的、仓位建议和观察顺序。</p>
+                      </div>
+                      <div className="placeholder-card">
+                        <strong>风险与偏差提醒</strong>
+                        <p>识别宣传倾向、证据不足、因果跳跃和容易误导决策的表述。</p>
+                      </div>
                     </div>
-                    <div className="placeholder-card">
-                      <strong>输出投资策略</strong>
-                      <p>给出受益方向、利空方向、适合关注的标的和仓位建议。</p>
-                    </div>
-                    <div className="placeholder-card">
-                      <strong>风险与偏差提醒</strong>
-                      <p>识别资料中的宣传倾向、证据不足点和可能误导的表述。</p>
-                    </div>
-                  </div>
+                  </section>
                 </>
               )}
 
