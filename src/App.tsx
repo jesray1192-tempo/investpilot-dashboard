@@ -24,7 +24,7 @@ type NavKey =
   | "us";
 
 type AiTabKey = "multimodal" | "strategy";
-type MarketTabKey = "heat" | "turnover" | "seal" | "winners" | "limitup";
+type MarketTabKey = "limitup" | "heat" | "turnover";
 type InsightTabKey = "sectors" | "funds" | "ai";
 type PortfolioTabKey = "holdings" | "trades";
 type PolicyMaterial = {
@@ -203,7 +203,7 @@ function buildMultimodalOutput(
 export default function App() {
   const [activeNav, setActiveNav] = useState<NavKey>("home");
   const [activeAiTab, setActiveAiTab] = useState<AiTabKey>("multimodal");
-  const [activeMarketTab, setActiveMarketTab] = useState<MarketTabKey>("heat");
+  const [activeMarketTab, setActiveMarketTab] = useState<MarketTabKey>("limitup");
   const [activeInsightTab, setActiveInsightTab] = useState<InsightTabKey>("sectors");
   const [activePortfolioTab, setActivePortfolioTab] = useState<PortfolioTabKey>("holdings");
   const [aiLinkInput, setAiLinkInput] = useState("");
@@ -418,6 +418,13 @@ export default function App() {
                 <div className="subnav-row market-subnav">
                   <button
                     type="button"
+                    className={`subnav-btn ${activeMarketTab === "limitup" ? "active" : ""}`}
+                    onClick={() => setActiveMarketTab("limitup")}
+                  >
+                    涨停板
+                  </button>
+                  <button
+                    type="button"
                     className={`subnav-btn ${activeMarketTab === "heat" ? "active" : ""}`}
                     onClick={() => setActiveMarketTab("heat")}
                   >
@@ -429,27 +436,6 @@ export default function App() {
                     onClick={() => setActiveMarketTab("turnover")}
                   >
                     成交额
-                  </button>
-                  <button
-                    type="button"
-                    className={`subnav-btn ${activeMarketTab === "seal" ? "active" : ""}`}
-                    onClick={() => setActiveMarketTab("seal")}
-                  >
-                    封板率
-                  </button>
-                  <button
-                    type="button"
-                    className={`subnav-btn ${activeMarketTab === "winners" ? "active" : ""}`}
-                    onClick={() => setActiveMarketTab("winners")}
-                  >
-                    昨涨停今表现
-                  </button>
-                  <button
-                    type="button"
-                    className={`subnav-btn ${activeMarketTab === "limitup" ? "active" : ""}`}
-                    onClick={() => setActiveMarketTab("limitup")}
-                  >
-                    涨停板
                   </button>
                 </div>
 
@@ -479,40 +465,6 @@ export default function App() {
                       <div>
                         <span>波动风险分</span>
                         <strong>{riskScore}/100</strong>
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                {activeMarketTab === "seal" && (
-                  <>
-                    <div className="big-metric up">{marketBreadth.sealRate.toFixed(2)}%</div>
-                    <div className="dual-metrics">
-                      <div>
-                        <span>封板</span>
-                        <strong>{marketBreadth.limitUp}</strong>
-                      </div>
-                      <div>
-                        <span>触及开板</span>
-                        <strong>{marketBreadth.openBoard}</strong>
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                {activeMarketTab === "winners" && (
-                  <>
-                    <div className="big-metric up">
-                      {marketBreadth.yesterdayLimitUpReturn.toFixed(2)}%
-                    </div>
-                    <div className="dual-metrics">
-                      <div>
-                        <span>高开率</span>
-                        <strong>{marketBreadth.highOpenRate}%</strong>
-                      </div>
-                      <div>
-                        <span>获利率</span>
-                        <strong>{marketBreadth.profitRate}%</strong>
                       </div>
                     </div>
                   </>
