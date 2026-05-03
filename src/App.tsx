@@ -590,16 +590,40 @@ export default function App() {
                 {activeInsightTab === "sectors" && (
                   <div className="board-list">
                     {sectorBoards.map((board) => (
-                      <div className="board-item" key={board.name}>
-                        <div>
-                          <strong>{board.name}</strong>
-                          <p>龙头：{board.leader}</p>
+                      <div className="board-item board-item-rich" key={board.id}>
+                        <div className="board-main">
+                          <div className="board-title-row">
+                            <strong>{board.name}</strong>
+                            <span className={board.change >= 0 ? "up board-change" : "down board-change"}>
+                              {percent(board.change)}
+                            </span>
+                          </div>
+                          <p>{board.note}</p>
+                          <div className="sector-stock-list">
+                            {board.stocks.map((stock) => (
+                              <div className="sector-stock-card" key={`${board.id}-${stock.role}-${stock.code}`}>
+                                <div className="sector-stock-head">
+                                  <span className="sector-stock-role">{stock.role}</span>
+                                  <div>
+                                    <strong>{stock.name}</strong>
+                                    <small>{stock.code}</small>
+                                  </div>
+                                </div>
+                                <div className="sector-stock-tags">
+                                  {stock.otherIndustries.map((industry) => (
+                                    <span className="tag" key={`${stock.code}-${industry}`}>
+                                      {industry}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                         <div className="board-side">
-                          <span className={board.change >= 0 ? "up" : "down"}>
-                            {percent(board.change)}
-                          </span>
-                          <p>{board.note}</p>
+                          <span>板块龙头</span>
+                          <strong>{board.leader}</strong>
+                          <p>同时观察板块内龙一、龙二、龙三的轮动与分支扩散。</p>
                         </div>
                       </div>
                     ))}

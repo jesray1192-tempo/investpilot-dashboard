@@ -55,10 +55,17 @@ export interface MarketBreadth {
 }
 
 export interface SectorBoard {
+  id: string;
   name: string;
   change: number;
   leader: string;
   note: string;
+  stocks: {
+    role: "龙头" | "龙一" | "龙二" | "龙三";
+    name: string;
+    code: string;
+    otherIndustries: string[];
+  }[];
 }
 
 export interface FundFlowBoard {

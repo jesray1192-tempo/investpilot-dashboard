@@ -393,14 +393,105 @@ h2 {
   padding: 18px;
 }
 
+.board-item-rich {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(220px, 0.7fr);
+  gap: 20px;
+}
+
+.board-main {
+  display: grid;
+  gap: 16px;
+}
+
+.board-title-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.board-title-row strong {
+  font-size: 1.45rem;
+}
+
+.board-change {
+  font-size: 1.8rem;
+  font-weight: 800;
+  flex: 0 0 auto;
+}
+
 .board-side {
   text-align: right;
   max-width: 280px;
+  display: grid;
+  gap: 8px;
+  align-content: start;
 }
 
 .board-side span {
+  font-size: 0.82rem;
+  color: rgba(242, 239, 232, 0.58);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.board-side strong {
   font-size: 1.5rem;
   font-weight: 800;
+}
+
+.sector-stock-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.sector-stock-card {
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 18px;
+  padding: 14px;
+  display: grid;
+  gap: 12px;
+}
+
+.sector-stock-head {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.sector-stock-head strong {
+  display: block;
+  font-size: 1rem;
+}
+
+.sector-stock-head small {
+  display: block;
+  margin-top: 4px;
+  color: rgba(242, 239, 232, 0.56);
+  font-size: 0.8rem;
+}
+
+.sector-stock-role {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 52px;
+  border-radius: 999px;
+  padding: 0.32rem 0.65rem;
+  background: rgba(63, 133, 255, 0.14);
+  border: 1px solid rgba(63, 133, 255, 0.22);
+  color: #8db7ff;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.sector-stock-tags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .ai-brief {
@@ -1069,6 +1160,10 @@ h2 {
   .holding-row,
   .source-item,
   .board-item {
+    grid-template-columns: 1fr;
+  }
+
+  .sector-stock-list {
     grid-template-columns: 1fr;
   }
 

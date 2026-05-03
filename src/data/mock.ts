@@ -32,28 +32,136 @@ export const marketBreadth: MarketBreadth = {
 
 export const sectorBoards: SectorBoard[] = [
   {
+    id: "low-altitude",
     name: "低空经济",
     change: 4.82,
     leader: "万丰奥威",
-    note: "政策预期强化，核心票维持强趋势。"
+    note: "政策预期强化，核心票维持强趋势。",
+    stocks: [
+      {
+        role: "龙头",
+        name: "万丰奥威",
+        code: "002085",
+        otherIndustries: ["飞行汽车", "汽车零部件", "通航装备"]
+      },
+      {
+        role: "龙一",
+        name: "中信海直",
+        code: "000099",
+        otherIndustries: ["通航运营", "应急救援", "低空服务"]
+      },
+      {
+        role: "龙二",
+        name: "宗申动力",
+        code: "001696",
+        otherIndustries: ["航空发动机", "摩托车", "新能源动力"]
+      },
+      {
+        role: "龙三",
+        name: "深城交",
+        code: "301091",
+        otherIndustries: ["智慧交通", "城市规划", "车路协同"]
+      }
+    ]
   },
   {
+    id: "robotics",
     name: "机器人",
     change: 3.94,
     leader: "鸣志电器",
-    note: "早盘资金回流，减速器与执行器方向最强。"
+    note: "早盘资金回流，减速器与执行器方向最强。",
+    stocks: [
+      {
+        role: "龙头",
+        name: "鸣志电器",
+        code: "603728",
+        otherIndustries: ["执行器", "自动化设备", "运动控制"]
+      },
+      {
+        role: "龙一",
+        name: "中大力德",
+        code: "002896",
+        otherIndustries: ["减速器", "工业机器人", "智能制造"]
+      },
+      {
+        role: "龙二",
+        name: "绿的谐波",
+        code: "688017",
+        otherIndustries: ["谐波减速器", "高端装备", "精密传动"]
+      },
+      {
+        role: "龙三",
+        name: "步科股份",
+        code: "688160",
+        otherIndustries: ["人机界面", "伺服系统", "工控"]
+      }
+    ]
   },
   {
+    id: "high-speed-copper",
     name: "铜缆高速连接",
     change: 2.76,
     leader: "沃尔核材",
-    note: "算力链分支活跃，容量票承接较好。"
+    note: "算力链分支活跃，容量票承接较好。",
+    stocks: [
+      {
+        role: "龙头",
+        name: "沃尔核材",
+        code: "002130",
+        otherIndustries: ["通信设备", "高速连接", "算力链"]
+      },
+      {
+        role: "龙一",
+        name: "神宇股份",
+        code: "300563",
+        otherIndustries: ["射频线缆", "高速通信", "消费电子"]
+      },
+      {
+        role: "龙二",
+        name: "华丰科技",
+        code: "688629",
+        otherIndustries: ["连接器", "军工电子", "服务器"]
+      },
+      {
+        role: "龙三",
+        name: "胜蓝股份",
+        code: "300843",
+        otherIndustries: ["连接器", "新能源汽车", "精密制造"]
+      }
+    ]
   },
   {
+    id: "innovative-drug",
     name: "创新药",
     change: -1.24,
     leader: "百利天恒",
-    note: "高位震荡，板块内部开始分化。"
+    note: "高位震荡，板块内部开始分化。",
+    stocks: [
+      {
+        role: "龙头",
+        name: "百利天恒",
+        code: "688506",
+        otherIndustries: ["ADC", "生物科技", "肿瘤药物"]
+      },
+      {
+        role: "龙一",
+        name: "荣昌生物",
+        code: "688331",
+        otherIndustries: ["抗体药物", "自身免疫", "创新生物药"]
+      },
+      {
+        role: "龙二",
+        name: "康方生物",
+        code: "09926.HK",
+        otherIndustries: ["双抗平台", "肿瘤免疫", "港股创新药"]
+      },
+      {
+        role: "龙三",
+        name: "信达生物",
+        code: "01801.HK",
+        otherIndustries: ["PD-1", "肿瘤管线", "医药研发"]
+      }
+    ]
   }
 ];
 
