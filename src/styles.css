@@ -143,9 +143,30 @@ button.secondary {
 .nav-copy small {
   color: rgba(242, 239, 232, 0.62);
   font-size: 0.82rem;
+  line-height: 1.45;
 }
 
 .content-area {
+  min-width: 0;
+}
+
+.content-area > *,
+.card,
+.market-strip,
+.placeholder-card,
+.upload-input-card,
+.material-list-card,
+.policy-link-card,
+.limitup-summary-card,
+.holding-row,
+.signal-item,
+.event-item,
+.source-item,
+.table-row,
+.limitup-row,
+.trade-item,
+.thesis-item,
+.board-item {
   min-width: 0;
 }
 
@@ -777,6 +798,7 @@ h2 {
 .inline-thesis-cell {
   color: rgba(242, 239, 232, 0.76);
   line-height: 1.55;
+  overflow-wrap: anywhere;
 }
 
 .table-row strong,
@@ -808,6 +830,7 @@ h2 {
   margin: 6px 0 0;
   color: rgba(242, 239, 232, 0.74);
   line-height: 1.6;
+  overflow-wrap: anywhere;
 }
 
 .trade-side {
@@ -973,6 +996,22 @@ h2 {
   max-width: 380px;
 }
 
+@media (max-width: 1360px) {
+  .table-head,
+  .wide-table-row {
+    grid-template-columns: 1.05fr 0.72fr 0.82fr 0.82fr 0.88fr 0.78fr 0.95fr 1.55fr;
+  }
+
+  .position-table {
+    min-width: 1040px;
+  }
+
+  .limitup-table .table-scroll > .limitup-head,
+  .limitup-table .table-scroll > .limitup-row {
+    min-width: 1240px;
+  }
+}
+
 @media (max-width: 1280px) {
   .app-layout {
     grid-template-columns: 1fr;
@@ -1000,6 +1039,28 @@ h2 {
   .card.wide {
     grid-column: auto;
   }
+
+  .placeholder-grid,
+  .upload-inline-grid,
+  .generated-grid,
+  .policy-link-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .holding-row,
+  .source-item,
+  .board-item {
+    grid-template-columns: 1fr;
+  }
+
+  .source-meta,
+  .board-side {
+    max-width: none;
+  }
+
+  .board-side {
+    text-align: left;
+  }
 }
 
 @media (max-width: 1024px) {
@@ -1007,6 +1068,59 @@ h2 {
   .overview-grid,
   .dashboard-grid {
     grid-template-columns: 1fr;
+  }
+
+  .app-shell {
+    padding: 20px 16px 44px;
+  }
+
+  .topbar,
+  .market-strip-head,
+  .source-item,
+  .board-item {
+    display: grid;
+  }
+
+  .index-row,
+  .limitup-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .subnav-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .subnav-btn,
+  .upload-trigger,
+  .action-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .position-table,
+  .limitup-table .table-scroll > .limitup-head,
+  .limitup-table .table-scroll > .limitup-row {
+    min-width: 0;
+  }
+
+  .table-head,
+  .limitup-head {
+    display: none;
+  }
+
+  .table-row,
+  .limitup-row,
+  .trade-item,
+  .thesis-item {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .trade-side {
+    text-align: left;
+    max-width: none;
   }
 }
 
@@ -1038,18 +1152,6 @@ h2 {
     grid-template-columns: 1fr;
   }
 
-  .topbar,
-  .market-strip-head,
-  .source-item,
-  .board-item {
-    display: grid;
-  }
-
-  .board-side {
-    text-align: left;
-    max-width: none;
-  }
-
   .gauge-ring {
     width: 150px;
     height: 150px;
@@ -1071,39 +1173,11 @@ h2 {
   }
 
   .subnav-row {
-    display: grid;
     grid-template-columns: 1fr;
-  }
-
-  .position-table,
-  .limitup-table .table-scroll > .limitup-head,
-  .limitup-table .table-scroll > .limitup-row {
-    min-width: 0;
-  }
-
-  .table-head {
-    display: none;
-  }
-
-  .limitup-head {
-    display: none;
   }
 
   .limitup-summary-grid {
     grid-template-columns: 1fr 1fr;
-  }
-
-  .table-row,
-  .limitup-row,
-  .trade-item,
-  .thesis-item {
-    grid-template-columns: 1fr;
-    display: grid;
-  }
-
-  .trade-side {
-    text-align: left;
-    max-width: none;
   }
 }
 
@@ -1115,5 +1189,21 @@ h2 {
 
   .nav-item {
     padding: 12px;
+  }
+
+  .nav-item,
+  .sidebar-brand {
+    align-items: flex-start;
+  }
+
+  .hero-grid,
+  .dual-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .material-item {
+    display: grid;
+    grid-template-columns: 1fr;
+    align-items: start;
   }
 }
