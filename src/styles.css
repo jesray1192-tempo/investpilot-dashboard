@@ -183,6 +183,10 @@ button.secondary {
   font-size: 0.95rem;
 }
 
+.action-link {
+  white-space: nowrap;
+}
+
 .market-strip,
 .card {
   background: rgba(9, 15, 28, 0.6);
@@ -1011,6 +1015,31 @@ h2 {
   gap: 16px;
 }
 
+.headline-feed {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 20px;
+  padding: 18px;
+}
+
+.headline-feed-copy {
+  display: grid;
+  gap: 10px;
+}
+
+.headline-feed-copy strong {
+  font-size: 1.2rem;
+}
+
+.headline-feed-copy p {
+  margin: 0;
+  color: rgba(242, 239, 232, 0.74);
+  line-height: 1.6;
+}
+
 .holding-row,
 .signal-item,
 .event-item,
@@ -1216,6 +1245,7 @@ h2 {
 
   .topbar,
   .market-strip-head,
+  .headline-feed,
   .source-item,
   .board-item {
     display: grid;
@@ -1302,6 +1332,11 @@ h2 {
   .gauge-ring {
     width: 150px;
     height: 150px;
+  }
+
+  .headline-feed {
+    grid-template-columns: 1fr;
+    gap: 12px;
   }
 
   .gauge-value,

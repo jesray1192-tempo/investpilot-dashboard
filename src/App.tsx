@@ -27,6 +27,7 @@ type AiTabKey = "multimodal" | "strategy";
 type MarketTabKey = "limitup" | "heat" | "turnover";
 type InsightTabKey = "sectors" | "funds" | "ai";
 type PortfolioTabKey = "holdings" | "trades";
+type HomeSubpageKey = "overview" | "events";
 type PolicyMaterial = {
   name: string;
   kind: string;
@@ -219,6 +220,7 @@ function buildMultimodalOutput(
 
 export default function App() {
   const [activeNav, setActiveNav] = useState<NavKey>("home");
+  const [activeHomeSubpage, setActiveHomeSubpage] = useState<HomeSubpageKey>("overview");
   const [activeAiTab, setActiveAiTab] = useState<AiTabKey>("multimodal");
   const [activeMarketTab, setActiveMarketTab] = useState<MarketTabKey>("limitup");
   const [activeInsightTab, setActiveInsightTab] = useState<InsightTabKey>("sectors");
@@ -257,6 +259,7 @@ export default function App() {
   }, [portfolio]);
 
   const currentNav = navItems.find((item) => item.key === activeNav) ?? navItems[0];
+  const homeHeadline = marketEvents[0];
   const investedRatio = Math.round((marketValue / (marketValue + 185000)) * 100);
   const dailyPnl = portfolio.reduce(
     (sum, item) => sum + item.shares * item.price * (item.dailyChange / 100),
@@ -341,6 +344,20 @@ export default function App() {
     setAnalysisRuns((count) => count + 1);
   }
 
+  function handleNavChange(nextNav: NavKey) {
+    setActiveNav(nextNav);
+    if (nextNav !== "home") {
+      setActiveHomeSubpage("overview");
+    }
+  }
+
+  const topbarTitle =
+    activeNav === "home" && activeHomeSubpage === "events" ? "事件与快讯" : currentNav.label;
+  const topbarDescription =
+    activeNav === "home" && activeHomeSubpage === "events"
+      ? "当天热点、快讯与情绪扰动列表"
+      : currentNav.description;
+
   return (
     <main className="app-shell app-layout">
       <aside className="sidebar">
@@ -357,7 +374,7 @@ export default function App() {
               key={item.key}
               type="button"
               className={`nav-item ${item.key === activeNav ? "active" : ""}`}
-              onClick={() => setActiveNav(item.key)}
+              onClick={() => handleNavChange(item.key)}
             >
               <span className="nav-icon">{item.icon}</span>
               <span className="nav-copy">
@@ -373,12 +390,12 @@ export default function App() {
         <header className="topbar">
           <div>
             <p className="section-kicker">Workspace</p>
-            <h2>{currentNav.label}</h2>
+            <h2>{topbarTitle}</h2>
           </div>
-          <div className="topbar-note">{currentNav.description}</div>
+          <div className="topbar-note">{topbarDescription}</div>
         </header>
 
-        {activeNav === "home" && (
+        {activeNav === "home" && activeHomeSubpage === "overview" && (
           <>
             <section className="home-top-feed">
               <article className="card wide">
@@ -387,19 +404,22 @@ export default function App() {
                     <p className="section-kicker">Feeds</p>
                     <h2>事件与快讯</h2>
                   </div>
+                  <button
+                    type="button"
+                    className="secondary action-link"
+                    onClick={() => setActiveHomeSubpage("events")}
+                  >
+                    查看更多
+                  </button>
                 </div>
-                <div className="event-list">
-                  {marketEvents.map((event) => (
-                    <div className="event-item" key={`${event.time}-${event.title}`}>
-                      <div className={`impact-dot ${event.impact}`} />
-                      <div>
-                        <strong>{event.title}</strong>
-                        <p>
-                          {event.time} · {event.source}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
+                <div className="headline-feed">
+                  <div className={`impact-dot ${homeHeadline.impact}`} />
+                  <div className="headline-feed-copy">
+                    <strong>{homeHeadline.title}</strong>
+                    <p>
+                      {homeHeadline.time} · {homeHeadline.source}
+                    </p>
+                  </div>
                 </div>
               </article>
             </section>
@@ -704,6 +724,39 @@ export default function App() {
 
             </section>
           </>
+        )}
+
+        {activeNav === "home" && activeHomeSubpage === "events" && (
+          <section className="home-top-feed">
+            <article className="card wide">
+              <div className="card-head">
+                <div>
+                  <p className="section-kicker">Feeds</p>
+                  <h2>当天热点</h2>
+                </div>
+                <button
+                  type="button"
+                  className="secondary action-link"
+                  onClick={() => setActiveHomeSubpage("overview")}
+                >
+                  返回首页
+                </button>
+              </div>
+              <div className="event-list">
+                {marketEvents.map((event) => (
+                  <div className="event-item" key={`${event.time}-${event.title}`}>
+                    <div className={`impact-dot ${event.impact}`} />
+                    <div>
+                      <strong>{event.title}</strong>
+                      <p>
+                        {event.time} · {event.source}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </article>
+          </section>
         )}
 
         {activeNav === "portfolio" && (
