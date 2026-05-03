@@ -795,6 +795,25 @@ h2 {
   min-width: 1120px;
 }
 
+.field-pair {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.field-label {
+  display: none;
+  color: rgba(242, 239, 232, 0.56);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.field-value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .inline-thesis-cell {
   color: rgba(242, 239, 232, 0.76);
   line-height: 1.55;
@@ -1074,6 +1093,32 @@ h2 {
     padding: 20px 16px 44px;
   }
 
+  .sidebar {
+    position: static;
+    padding: 16px;
+  }
+
+  .sidebar-brand {
+    margin-bottom: 14px;
+  }
+
+  .sidebar-nav {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    padding-bottom: 6px;
+    scrollbar-width: none;
+  }
+
+  .sidebar-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .nav-item {
+    min-width: 220px;
+    flex: 0 0 auto;
+  }
+
   .topbar,
   .market-strip-head,
   .source-item,
@@ -1118,6 +1163,10 @@ h2 {
     gap: 12px;
   }
 
+  .field-label {
+    display: block;
+  }
+
   .trade-side {
     text-align: left;
     max-width: none;
@@ -1149,7 +1198,10 @@ h2 {
   }
 
   .sidebar-nav {
+    display: grid;
     grid-template-columns: 1fr;
+    overflow: visible;
+    padding-bottom: 0;
   }
 
   .gauge-ring {
@@ -1178,6 +1230,10 @@ h2 {
 
   .limitup-summary-grid {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .nav-item {
+    min-width: 0;
   }
 }
 

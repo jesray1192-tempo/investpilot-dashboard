@@ -1,4 +1,4 @@
-import { ChangeEvent, DragEvent, useMemo, useState } from "react";
+import { ChangeEvent, DragEvent, ReactNode, useMemo, useState } from "react";
 import {
   dataSources,
   fundFlowBoards,
@@ -37,6 +37,23 @@ type UploadAsset = {
   kind: string;
   source: "file" | "link";
 };
+
+function FieldValue({
+  label,
+  value,
+  className = ""
+}: {
+  label: string;
+  value: ReactNode;
+  className?: string;
+}) {
+  return (
+    <span className={`field-pair ${className}`.trim()}>
+      <small className="field-label">{label}</small>
+      <span className="field-value">{value}</span>
+    </span>
+  );
+}
 
 interface NavItem {
   key: NavKey;
@@ -505,21 +522,31 @@ export default function App() {
                       </div>
                       {limitUpStocks.map((stock) => (
                         <div className="limitup-row" key={stock.code}>
-                          <span>
+                          <FieldValue
+                            label="股票"
+                            value={
+                              <>
                             <strong>{stock.name}</strong>
                             <small>{stock.code}</small>
-                          </span>
-                          <span>{currency(stock.price)}</span>
-                          <span>{stock.limitUpCount} 次</span>
-                          <span>{stock.firstLimitUpTime}</span>
-                          <span>{stock.openBoardCount} 次</span>
-                          <span>{stock.sealAmount}</span>
-                          <span>{stock.sealStrength}</span>
-                          <span className={stock.ladderType === "连板" ? "up" : "watch"}>
-                            {stock.ladderType}
-                          </span>
-                          <span>{stock.reason}</span>
-                          <span>{stock.industry}</span>
+                              </>
+                            }
+                          />
+                          <FieldValue label="价格" value={currency(stock.price)} />
+                          <FieldValue label="涨停次数" value={`${stock.limitUpCount} 次`} />
+                          <FieldValue label="首次涨停" value={stock.firstLimitUpTime} />
+                          <FieldValue label="开板次数" value={`${stock.openBoardCount} 次`} />
+                          <FieldValue label="封单额" value={stock.sealAmount} />
+                          <FieldValue label="封单强度" value={stock.sealStrength} />
+                          <FieldValue
+                            label="分类"
+                            value={
+                              <span className={stock.ladderType === "连板" ? "up" : "watch"}>
+                                {stock.ladderType}
+                              </span>
+                            }
+                          />
+                          <FieldValue label="涨停原因" value={stock.reason} />
+                          <FieldValue label="股票行业" value={stock.industry} />
                         </div>
                       ))}
                     </div>
@@ -790,23 +817,35 @@ export default function App() {
 
                         return (
                           <div className="table-row wide-table-row" key={item.code}>
-                            <span>
+                            <FieldValue
+                              label="股票"
+                              value={
+                                <>
                               <strong>{item.name}</strong>
                               <small>{item.code}</small>
-                            </span>
-                            <span>{item.shares}</span>
-                            <span>{currency(item.cost)}</span>
-                            <span>{currency(item.price)}</span>
-                            <span className={totalPnl >= 0 ? "up" : "down"}>
-                              {currency(totalPnl)}
-                            </span>
-                            <span className={returnRate >= 0 ? "up" : "down"}>
-                              {percent(returnRate)}
-                            </span>
-                            <span>
-                              目标 {item.targetPrice} / 止损 {item.stopLoss}
-                            </span>
-                            <span className="inline-thesis-cell">{thesis?.reason ?? item.thesis}</span>
+                                </>
+                              }
+                            />
+                            <FieldValue label="持仓股数" value={item.shares} />
+                            <FieldValue label="成本价" value={currency(item.cost)} />
+                            <FieldValue label="现价" value={currency(item.price)} />
+                            <FieldValue
+                              label="总盈亏"
+                              value={<span className={totalPnl >= 0 ? "up" : "down"}>{currency(totalPnl)}</span>}
+                            />
+                            <FieldValue
+                              label="收益率"
+                              value={<span className={returnRate >= 0 ? "up" : "down"}>{percent(returnRate)}</span>}
+                            />
+                            <FieldValue
+                              label="纪律"
+                              value={`目标 ${item.targetPrice} / 止损 ${item.stopLoss}`}
+                            />
+                            <FieldValue
+                              label="买入逻辑"
+                              className="inline-thesis-cell"
+                              value={thesis?.reason ?? item.thesis}
+                            />
                           </div>
                         );
                       })}
