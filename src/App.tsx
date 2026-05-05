@@ -24,7 +24,7 @@ type NavKey =
   | "us";
 
 type AiTabKey = "multimodal" | "strategy";
-type MarketTabKey = "limitup" | "heat" | "turnover";
+type MarketTabKey = "limitup" | "heat" | "turnover" | "boards";
 type InsightTabKey = "sectors" | "funds" | "ai";
 type PortfolioTabKey = "holdings" | "trades";
 type HomeSubpageKey = "overview" | "events";
@@ -534,6 +534,13 @@ export default function App() {
                   >
                     成交额
                   </button>
+                  <button
+                    type="button"
+                    className={`subnav-btn ${activeMarketTab === "boards" ? "active" : ""}`}
+                    onClick={() => setActiveMarketTab("boards")}
+                  >
+                    板块
+                  </button>
                 </div>
 
                 {activeMarketTab === "heat" && (
@@ -632,138 +639,137 @@ export default function App() {
                     </div>
                   </div>
                 )}
+
+                {activeMarketTab === "boards" && (
+                  <div className="embedded-insight">
+                    <div className="subnav-row market-subnav insight-subnav">
+                      <button
+                        type="button"
+                        className={`subnav-btn ${activeInsightTab === "sectors" ? "active" : ""}`}
+                        onClick={() => setActiveInsightTab("sectors")}
+                      >
+                        当日板块
+                      </button>
+                      <button
+                        type="button"
+                        className={`subnav-btn ${activeInsightTab === "funds" ? "active" : ""}`}
+                        onClick={() => setActiveInsightTab("funds")}
+                      >
+                        资金板块
+                      </button>
+                      <button
+                        type="button"
+                        className={`subnav-btn ${activeInsightTab === "ai" ? "active" : ""}`}
+                        onClick={() => setActiveInsightTab("ai")}
+                      >
+                        AI盘面结论
+                      </button>
+                    </div>
+
+                    {activeInsightTab === "sectors" && (
+                      <div className="board-list">
+                        {sectorBoards.map((board) => (
+                          <div className="board-item board-item-rich" key={board.id}>
+                            <div className="board-main">
+                              <div className="board-summary-row">
+                                <div className="board-title-group">
+                                  <div className="board-title-row">
+                                    <strong>{board.name}</strong>
+                                    <span
+                                      className={
+                                        board.change >= 0 ? "up board-change" : "down board-change"
+                                      }
+                                    >
+                                      {percent(board.change)}
+                                    </span>
+                                  </div>
+                                  <div className="board-leader-inline">
+                                    <span>板块龙头</span>
+                                    <strong>{board.leader}</strong>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="sector-stock-list">
+                                {board.stocks.map((stock) => (
+                                  <div
+                                    className="sector-stock-card"
+                                    key={`${board.id}-${stock.role}-${stock.code}`}
+                                  >
+                                    <div className="sector-stock-head">
+                                      <span className="sector-stock-role">{stock.role}</span>
+                                      <div>
+                                        <strong>{stock.name}</strong>
+                                        <small>{stock.code}</small>
+                                      </div>
+                                    </div>
+                                    <div className="sector-stock-tags">
+                                      {stock.otherIndustries.map((industry) => (
+                                        <span className="tag" key={`${stock.code}-${industry}`}>
+                                          {industry}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {activeInsightTab === "funds" && (
+                      <div className="board-list">
+                        {fundFlowBoards.map((board) => (
+                          <div className="board-item" key={board.name}>
+                            <div>
+                              <strong>{board.name}</strong>
+                              <p>{board.note}</p>
+                            </div>
+                            <div className="board-side">
+                              <span className={board.strength}>{board.inflow}</span>
+                              <p>
+                                {board.strength === "strong"
+                                  ? "主力净流入"
+                                  : board.strength === "weak"
+                                    ? "主力净流出"
+                                    : "观察中"}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {activeInsightTab === "ai" && (
+                      <div className="ai-brief">
+                        <p>{aiSummary(portfolio)}</p>
+                        <div className="hero-grid compact-grid">
+                          <div>
+                            <strong>{currency(marketValue)}</strong>
+                            <span>持仓市值</span>
+                          </div>
+                          <div>
+                            <strong>{percent(pnlPercent)}</strong>
+                            <span>累计收益</span>
+                          </div>
+                          <div>
+                            <strong>{bestHolding.name}</strong>
+                            <span>今日相对强势</span>
+                          </div>
+                          <div>
+                            <strong>{dataSources.length}</strong>
+                            <span>数据源预留</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </article>
             </section>
 
             <section className="dashboard-grid">
-              <article className="card wide full-span market-tabs-card">
-                <div className="card-head">
-                  <div>
-                    <p className="section-kicker">Insight Deck</p>
-                    <h2>板块与 AI 结论</h2>
-                  </div>
-                </div>
-                <div className="subnav-row market-subnav">
-                  <button
-                    type="button"
-                    className={`subnav-btn ${activeInsightTab === "sectors" ? "active" : ""}`}
-                    onClick={() => setActiveInsightTab("sectors")}
-                  >
-                    当日板块
-                  </button>
-                  <button
-                    type="button"
-                    className={`subnav-btn ${activeInsightTab === "funds" ? "active" : ""}`}
-                    onClick={() => setActiveInsightTab("funds")}
-                  >
-                    资金板块
-                  </button>
-                  <button
-                    type="button"
-                    className={`subnav-btn ${activeInsightTab === "ai" ? "active" : ""}`}
-                    onClick={() => setActiveInsightTab("ai")}
-                  >
-                    AI盘面结论
-                  </button>
-                </div>
-
-                {activeInsightTab === "sectors" && (
-                  <div className="board-list">
-                    {sectorBoards.map((board) => (
-                      <div className="board-item board-item-rich" key={board.id}>
-                        <div className="board-main">
-                          <div className="board-summary-row">
-                            <div className="board-title-group">
-                              <div className="board-title-row">
-                                <strong>{board.name}</strong>
-                                <span
-                                  className={
-                                    board.change >= 0 ? "up board-change" : "down board-change"
-                                  }
-                                >
-                                  {percent(board.change)}
-                                </span>
-                              </div>
-                              <div className="board-leader-inline">
-                                <span>板块龙头</span>
-                                <strong>{board.leader}</strong>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="sector-stock-list">
-                            {board.stocks.map((stock) => (
-                              <div className="sector-stock-card" key={`${board.id}-${stock.role}-${stock.code}`}>
-                                <div className="sector-stock-head">
-                                  <span className="sector-stock-role">{stock.role}</span>
-                                  <div>
-                                    <strong>{stock.name}</strong>
-                                    <small>{stock.code}</small>
-                                  </div>
-                                </div>
-                                <div className="sector-stock-tags">
-                                  {stock.otherIndustries.map((industry) => (
-                                    <span className="tag" key={`${stock.code}-${industry}`}>
-                                      {industry}
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {activeInsightTab === "funds" && (
-                  <div className="board-list">
-                    {fundFlowBoards.map((board) => (
-                      <div className="board-item" key={board.name}>
-                        <div>
-                          <strong>{board.name}</strong>
-                          <p>{board.note}</p>
-                        </div>
-                        <div className="board-side">
-                          <span className={board.strength}>{board.inflow}</span>
-                          <p>
-                            {board.strength === "strong"
-                              ? "主力净流入"
-                              : board.strength === "weak"
-                                ? "主力净流出"
-                                : "观察中"}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {activeInsightTab === "ai" && (
-                  <div className="ai-brief">
-                    <p>{aiSummary(portfolio)}</p>
-                    <div className="hero-grid compact-grid">
-                      <div>
-                        <strong>{currency(marketValue)}</strong>
-                        <span>持仓市值</span>
-                      </div>
-                      <div>
-                        <strong>{percent(pnlPercent)}</strong>
-                        <span>累计收益</span>
-                      </div>
-                      <div>
-                        <strong>{bestHolding.name}</strong>
-                        <span>今日相对强势</span>
-                      </div>
-                      <div>
-                        <strong>{dataSources.length}</strong>
-                        <span>数据源预留</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </article>
-
               <article className="card source-card">
                 <div className="card-head">
                   <div>

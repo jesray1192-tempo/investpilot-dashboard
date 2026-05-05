@@ -862,6 +862,15 @@ h2 {
   margin-bottom: 28px;
 }
 
+.embedded-insight {
+  display: grid;
+  gap: 18px;
+}
+
+.insight-subnav {
+  margin: 0;
+}
+
 .subnav-btn {
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
