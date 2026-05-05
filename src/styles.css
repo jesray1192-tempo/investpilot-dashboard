@@ -339,6 +339,35 @@ h2 {
   min-height: 250px;
 }
 
+.portfolio-overview-card {
+  min-height: auto;
+}
+
+.portfolio-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.portfolio-metric-tile {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 20px;
+  padding: 20px;
+  display: grid;
+  gap: 10px;
+}
+
+.portfolio-metric-tile span,
+.portfolio-metric-tile small {
+  color: rgba(242, 239, 232, 0.68);
+}
+
+.portfolio-metric-tile strong {
+  font-size: clamp(2rem, 3vw, 3.3rem);
+  line-height: 1;
+}
+
 .market-tabs-card {
   min-height: 360px;
 }
@@ -925,7 +954,8 @@ h2 {
 }
 
 .position-table {
-  min-width: 1120px;
+  width: 100%;
+  min-width: 980px;
 }
 
 .field-pair {
@@ -1205,7 +1235,7 @@ h2 {
   }
 
   .position-table {
-    min-width: 1040px;
+    min-width: 960px;
   }
 
   .limitup-table .table-scroll > .limitup-head,
@@ -1261,6 +1291,10 @@ h2 {
 
   .sector-stock-list {
     grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  }
+
+  .portfolio-metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .source-meta {
@@ -1372,7 +1406,8 @@ h2 {
   .holding-row,
   .source-item,
   .board-item,
-  .dual-metrics {
+  .dual-metrics,
+  .portfolio-metric-grid {
     grid-template-columns: 1fr;
   }
 

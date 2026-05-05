@@ -826,93 +826,40 @@ export default function App() {
         {activeNav === "portfolio" && (
           <section className="portfolio-view">
             <section className="overview-grid">
-              <article className="card metric-card">
+              <article className="card full-span portfolio-overview-card">
                 <div className="card-head">
                   <div>
-                    <p className="section-kicker">Portfolio Value</p>
-                    <h2>持仓总市值</h2>
+                    <p className="section-kicker">Portfolio Overview</p>
+                    <h2>持仓总览</h2>
                   </div>
                 </div>
-                <div className="big-metric">{currency(marketValue)}</div>
-                <div className="dual-metrics">
-                  <div>
-                    <span>累计盈亏</span>
-                    <strong className={pnl >= 0 ? "up" : "down"}>{currency(pnl)}</strong>
+                <div className="portfolio-metric-grid">
+                  <div className="portfolio-metric-tile">
+                    <span>市值</span>
+                    <strong>{currency(marketValue)}</strong>
+                    <small>累计收益率 {percent(pnlPercent)}</small>
                   </div>
-                  <div>
-                    <span>累计收益率</span>
-                    <strong className={pnlPercent >= 0 ? "up" : "down"}>
-                      {percent(pnlPercent)}
-                    </strong>
+                  <div className="portfolio-metric-tile">
+                    <span>盈亏</span>
+                    <strong className={dailyPnl >= 0 ? "up" : "down"}>{currency(dailyPnl)}</strong>
+                    <small>累计盈亏 {currency(pnl)}</small>
                   </div>
-                </div>
-              </article>
-
-              <article className="card metric-card">
-                <div className="card-head">
-                  <div>
-                    <p className="section-kicker">Daily</p>
-                    <h2>当日盈亏</h2>
+                  <div className="portfolio-metric-tile">
+                    <span>仓位</span>
+                    <strong>{investedRatio}%</strong>
+                    <small>现金估算 {currency(185000)}</small>
                   </div>
-                </div>
-                <div className={`big-metric ${dailyPnl >= 0 ? "up" : "down"}`}>
-                  {currency(dailyPnl)}
-                </div>
-                <div className="dual-metrics">
-                  <div>
-                    <span>强势个股</span>
-                    <strong>{bestHolding.name}</strong>
-                  </div>
-                  <div>
-                    <span>波动风险</span>
-                    <strong>{riskScore}/100</strong>
-                  </div>
-                </div>
-              </article>
-
-              <article className="card metric-card">
-                <div className="card-head">
-                  <div>
-                    <p className="section-kicker">Allocation</p>
-                    <h2>仓位使用率</h2>
-                  </div>
-                </div>
-                <div className="big-metric">{investedRatio}%</div>
-                <div className="dual-metrics">
-                  <div>
-                    <span>现金估算</span>
-                    <strong>{currency(185000)}</strong>
-                  </div>
-                  <div>
-                    <span>核心仓占比</span>
-                    <strong>58%</strong>
-                  </div>
-                </div>
-              </article>
-
-              <article className="card metric-card">
-                <div className="card-head">
-                  <div>
-                    <p className="section-kicker">Discipline</p>
-                    <h2>纪律执行</h2>
-                  </div>
-                </div>
-                <div className="big-metric up">3 / 4</div>
-                <div className="dual-metrics">
-                  <div>
-                    <span>目标价覆盖</span>
-                    <strong>100%</strong>
-                  </div>
-                  <div>
-                    <span>止损线覆盖</span>
-                    <strong>100%</strong>
+                  <div className="portfolio-metric-tile">
+                    <span>纪律执行</span>
+                    <strong className="up">3 / 4</strong>
+                    <small>目标价与止损覆盖 100%</small>
                   </div>
                 </div>
               </article>
             </section>
 
             <section className="dashboard-grid">
-              <article className="card wide">
+              <article className="card full-span">
                 <div className="card-head">
                   <div>
                     <p className="section-kicker">Portfolio Book</p>
@@ -1021,7 +968,7 @@ export default function App() {
                 )}
               </article>
 
-              <article className="card wide">
+              <article className="card full-span">
                 <div className="card-head">
                   <div>
                     <p className="section-kicker">Risk</p>
