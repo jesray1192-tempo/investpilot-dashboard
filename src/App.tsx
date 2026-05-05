@@ -1,4 +1,4 @@
-import { ChangeEvent, DragEvent, ReactNode, useMemo, useState } from "react";
+import { ChangeEvent, DragEvent, ReactNode, useEffect, useMemo, useState } from "react";
 import {
   dataSources,
   fundFlowBoards,
@@ -6,13 +6,13 @@ import {
   limitUpStocks,
   marketBreadth,
   marketEvents,
-  marketIndices,
   riskSignals,
   sectorBoards,
   thesisRecords,
   tradeRecords
 } from "./data/mock";
-import { Holding } from "./types";
+import { fetchLiveMarketIndices } from "./services/marketIndices";
+import { Holding, MarketIndex } from "./types";
 
 type NavKey =
   | "home"
@@ -240,6 +240,10 @@ export default function App() {
     { name: "新闻联播截图摘要", kind: "图片材料" },
     { name: "行业纪要补充说明", kind: "文本备注" }
   ]);
+  const [marketIndices, setMarketIndices] = useState<MarketIndex[]>([]);
+  const [marketIndicesLoading, setMarketIndicesLoading] = useState(true);
+  const [marketIndicesError, setMarketIndicesError] = useState("");
+  const [marketIndicesUpdatedAt, setMarketIndicesUpdatedAt] = useState("");
   const [portfolio] = useState(holdings);
   const marketValue = useMemo(() => totalMarketValue(portfolio), [portfolio]);
   const costValue = useMemo(() => totalCostValue(portfolio), [portfolio]);
@@ -257,6 +261,53 @@ export default function App() {
         20
     );
   }, [portfolio]);
+
+  useEffect(() => {
+    let disposed = false;
+
+    const loadMarketIndices = async () => {
+      try {
+        setMarketIndicesError("");
+        const nextIndices = await fetchLiveMarketIndices();
+
+        if (disposed) {
+          return;
+        }
+
+        setMarketIndices(nextIndices);
+        setMarketIndicesUpdatedAt(
+          new Intl.DateTimeFormat("zh-CN", {
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+            hour12: false
+          }).format(new Date())
+        );
+      } catch (error) {
+        if (disposed) {
+          return;
+        }
+
+        setMarketIndicesError(
+          error instanceof Error ? error.message : "实时行情获取失败，请稍后重试。"
+        );
+      } finally {
+        if (!disposed) {
+          setMarketIndicesLoading(false);
+        }
+      }
+    };
+
+    void loadMarketIndices();
+    const timer = window.setInterval(() => {
+      void loadMarketIndices();
+    }, 60_000);
+
+    return () => {
+      disposed = true;
+      window.clearInterval(timer);
+    };
+  }, []);
 
   const currentNav = navItems.find((item) => item.key === activeNav) ?? navItems[0];
   const homeHeadline = marketEvents[0];
@@ -426,12 +477,21 @@ export default function App() {
 
             <section className="market-strip card">
               <div className="market-strip-head">
-                <p className="section-kicker">Market Pulse</p>
-                <h1>今日市场总览</h1>
+                <div className="market-strip-title">
+                  <p className="section-kicker">Market Pulse</p>
+                  <h1>今日市场总览</h1>
+                  <p className="market-strip-meta">
+                    {marketIndicesError
+                      ? `数据源异常：${marketIndicesError}`
+                      : marketIndicesLoading
+                        ? "正在获取真实指数行情..."
+                        : `数据来源：东方财富实时行情 · ${marketIndicesUpdatedAt} 更新`}
+                  </p>
+                </div>
               </div>
               <div className="index-row">
                 {marketIndices.map((index) => (
-                  <div className="index-item" key={index.name}>
+                  <div className="index-item" key={index.code ?? index.name}>
                     <span className="index-name">{index.name}</span>
                     <strong className={index.change >= 0 ? "up" : "down"}>
                       {index.value.toFixed(2)}
@@ -612,13 +672,24 @@ export default function App() {
                     {sectorBoards.map((board) => (
                       <div className="board-item board-item-rich" key={board.id}>
                         <div className="board-main">
-                          <div className="board-title-row">
-                            <strong>{board.name}</strong>
-                            <span className={board.change >= 0 ? "up board-change" : "down board-change"}>
-                              {percent(board.change)}
-                            </span>
+                          <div className="board-summary-row">
+                            <div className="board-title-group">
+                              <div className="board-title-row">
+                                <strong>{board.name}</strong>
+                                <span
+                                  className={
+                                    board.change >= 0 ? "up board-change" : "down board-change"
+                                  }
+                                >
+                                  {percent(board.change)}
+                                </span>
+                              </div>
+                              <div className="board-leader-inline">
+                                <span>板块龙头</span>
+                                <strong>{board.leader}</strong>
+                              </div>
+                            </div>
                           </div>
-                          <p>{board.note}</p>
                           <div className="sector-stock-list">
                             {board.stocks.map((stock) => (
                               <div className="sector-stock-card" key={`${board.id}-${stock.role}-${stock.code}`}>
@@ -639,11 +710,6 @@ export default function App() {
                               </div>
                             ))}
                           </div>
-                        </div>
-                        <div className="board-side">
-                          <span>板块龙头</span>
-                          <strong>{board.leader}</strong>
-                          <p>同时观察板块内龙一、龙二、龙三的轮动与分支扩散。</p>
                         </div>
                       </div>
                     ))}

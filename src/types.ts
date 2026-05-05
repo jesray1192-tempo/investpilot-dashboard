@@ -37,6 +37,7 @@ export interface MarketEvent {
 }
 
 export interface MarketIndex {
+  code?: string;
   name: string;
   value: number;
   change: number;

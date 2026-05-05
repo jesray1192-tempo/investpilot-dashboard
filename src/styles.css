@@ -287,10 +287,24 @@ h2 {
 
 .market-strip-head {
   display: flex;
-  justify-content: space-between;
-  align-items: end;
+  justify-content: flex-start;
+  align-items: flex-start;
   gap: 16px;
   margin-bottom: 18px;
+}
+
+.market-strip-title {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  text-align: left;
+}
+
+.market-strip-meta {
+  margin: 0;
+  color: rgba(242, 239, 232, 0.68);
+  font-size: 0.92rem;
+  line-height: 1.5;
 }
 
 .index-row {
@@ -398,9 +412,7 @@ h2 {
 }
 
 .board-item-rich {
-  display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(220px, 0.7fr);
-  gap: 20px;
+  display: block;
 }
 
 .board-main {
@@ -408,11 +420,22 @@ h2 {
   gap: 16px;
 }
 
+.board-summary-row {
+  display: grid;
+  gap: 10px;
+}
+
+.board-title-group {
+  display: grid;
+  gap: 10px;
+}
+
 .board-title-row {
   display: flex;
   justify-content: space-between;
   gap: 16px;
   align-items: flex-start;
+  flex-wrap: wrap;
 }
 
 .board-title-row strong {
@@ -425,30 +448,31 @@ h2 {
   flex: 0 0 auto;
 }
 
-.board-side {
-  text-align: right;
-  max-width: 280px;
-  display: grid;
-  gap: 8px;
-  align-content: start;
+.board-leader-inline {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
-.board-side span {
+.board-leader-inline span {
   font-size: 0.82rem;
   color: rgba(242, 239, 232, 0.58);
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
 
-.board-side strong {
-  font-size: 1.5rem;
+.board-leader-inline strong {
+  font-size: 1.35rem;
   font-weight: 800;
 }
 
 .sector-stock-list {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 12px;
+  align-items: stretch;
 }
 
 .sector-stock-card {
@@ -458,6 +482,7 @@ h2 {
   padding: 14px;
   display: grid;
   gap: 12px;
+  min-width: 0;
 }
 
 .sector-stock-head {
@@ -1196,13 +1221,8 @@ h2 {
     grid-template-columns: 1fr;
   }
 
-  .source-meta,
-  .board-side {
+  .source-meta {
     max-width: none;
-  }
-
-  .board-side {
-    text-align: left;
   }
 }
 
