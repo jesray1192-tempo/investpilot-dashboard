@@ -272,6 +272,10 @@ h2 {
   grid-column: span 8;
 }
 
+.card.full-span {
+  grid-column: 1 / -1;
+}
+
 .card-head {
   display: flex;
   justify-content: space-between;
@@ -470,7 +474,7 @@ h2 {
 
 .sector-stock-list {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 12px;
   align-items: stretch;
 }
@@ -1154,6 +1158,31 @@ h2 {
   justify-content: space-between;
 }
 
+.source-card {
+  grid-column: span 4;
+  align-self: start;
+}
+
+.source-list-compact {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.source-list-compact .source-item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  padding: 12px 16px;
+  border-radius: 16px;
+  min-height: auto;
+}
+
+.source-list-compact .source-item strong {
+  font-size: 1rem;
+}
+
 .source-meta {
   display: grid;
   gap: 8px;
@@ -1217,8 +1246,12 @@ h2 {
     grid-template-columns: 1fr;
   }
 
+  .source-card {
+    grid-column: 1 / -1;
+  }
+
   .sector-stock-list {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   }
 
   .source-meta {

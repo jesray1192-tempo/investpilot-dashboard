@@ -636,7 +636,7 @@ export default function App() {
             </section>
 
             <section className="dashboard-grid">
-              <article className="card wide market-tabs-card">
+              <article className="card wide full-span market-tabs-card">
                 <div className="card-head">
                   <div>
                     <p className="section-kicker">Insight Deck</p>
@@ -764,25 +764,17 @@ export default function App() {
                 )}
               </article>
 
-              <article className="card wide">
+              <article className="card source-card">
                 <div className="card-head">
                   <div>
                     <p className="section-kicker">Connectors</p>
-                    <h2>数据接入与后续建设</h2>
+                    <h2>数据来源</h2>
                   </div>
                 </div>
-                <div className="source-list">
+                <div className="source-list source-list-compact">
                   {dataSources.map((source) => (
                     <div className="source-item" key={source.id}>
-                      <div>
-                        <strong>{source.name}</strong>
-                        <p>{source.channel}</p>
-                      </div>
-                      <div className="source-meta">
-                        <span className={`status ${source.status}`}>{source.status}</span>
-                        <span>{source.coverage}</span>
-                        <span>{source.notes}</span>
-                      </div>
+                      <strong>{source.name}</strong>
                     </div>
                   ))}
                 </div>
