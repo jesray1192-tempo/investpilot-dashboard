@@ -1086,6 +1086,10 @@ h2 {
   font-size: 0.82rem;
 }
 
+.limitup-table .field-label {
+  display: none;
+}
+
 .limitup-table .table-scroll > .limitup-head,
 .limitup-table .table-scroll > .limitup-row {
   min-width: 1120px;
