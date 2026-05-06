@@ -3,7 +3,6 @@ import {
   dataSources,
   fundFlowBoards,
   holdings,
-  limitUpStocks,
   marketBreadth,
   marketEvents,
   riskSignals,
@@ -11,8 +10,9 @@ import {
   thesisRecords,
   tradeRecords
 } from "./data/mock";
+import { fetchLiveLimitUpPool } from "./services/limitUpPool";
 import { fetchLiveMarketIndices } from "./services/marketIndices";
-import { Holding, MarketIndex } from "./types";
+import { Holding, LimitUpStock, MarketIndex } from "./types";
 
 type NavKey =
   | "home"
@@ -122,6 +122,16 @@ function currency(value: number) {
 
 function percent(value: number) {
   return `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
+}
+
+function formatCompactDate(value: number) {
+  const text = `${value}`;
+
+  if (text.length !== 8) {
+    return text;
+  }
+
+  return `${text.slice(0, 4)}-${text.slice(4, 6)}-${text.slice(6, 8)}`;
 }
 
 function totalMarketValue(items: Holding[]) {
@@ -244,6 +254,10 @@ export default function App() {
   const [marketIndicesLoading, setMarketIndicesLoading] = useState(true);
   const [marketIndicesError, setMarketIndicesError] = useState("");
   const [marketIndicesUpdatedAt, setMarketIndicesUpdatedAt] = useState("");
+  const [limitUpStocks, setLimitUpStocks] = useState<LimitUpStock[]>([]);
+  const [limitUpLoading, setLimitUpLoading] = useState(true);
+  const [limitUpError, setLimitUpError] = useState("");
+  const [limitUpUpdatedAt, setLimitUpUpdatedAt] = useState("");
   const [portfolio] = useState(holdings);
   const marketValue = useMemo(() => totalMarketValue(portfolio), [portfolio]);
   const costValue = useMemo(() => totalCostValue(portfolio), [portfolio]);
@@ -309,6 +323,51 @@ export default function App() {
     };
   }, []);
 
+  useEffect(() => {
+    let disposed = false;
+
+    const loadLimitUpPool = async () => {
+      try {
+        setLimitUpError("");
+        const nextPool = await fetchLiveLimitUpPool();
+
+        if (disposed) {
+          return;
+        }
+
+        setLimitUpStocks(nextPool.pool);
+        setLimitUpUpdatedAt(
+          `${formatCompactDate(nextPool.qdate ?? 0)} · ${new Intl.DateTimeFormat("zh-CN", {
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+            hour12: false
+          }).format(new Date())}`
+        );
+      } catch (error) {
+        if (disposed) {
+          return;
+        }
+
+        setLimitUpError(error instanceof Error ? error.message : "涨停池获取失败，请稍后重试。");
+      } finally {
+        if (!disposed) {
+          setLimitUpLoading(false);
+        }
+      }
+    };
+
+    void loadLimitUpPool();
+    const timer = window.setInterval(() => {
+      void loadLimitUpPool();
+    }, 60_000);
+
+    return () => {
+      disposed = true;
+      window.clearInterval(timer);
+    };
+  }, []);
+
   const currentNav = navItems.find((item) => item.key === activeNav) ?? navItems[0];
   const homeHeadline = marketEvents[0];
   const investedRatio = Math.round((marketValue / (marketValue + 185000)) * 100);
@@ -316,7 +375,9 @@ export default function App() {
     (sum, item) => sum + item.shares * item.price * (item.dailyChange / 100),
     0
   );
-  const maxLimitUpHeight = Math.max(...limitUpStocks.map((stock) => stock.limitUpCount));
+  const maxLimitUpHeight = limitUpStocks.length
+    ? Math.max(...limitUpStocks.map((stock) => stock.consecutiveBoardCount))
+    : 0;
   const totalOpenBoardCount = limitUpStocks.reduce((sum, stock) => sum + stock.openBoardCount, 0);
   const firstBoardCount = limitUpStocks.filter((stock) => stock.ladderType === "首板").length;
   const consecutiveBoardCount = limitUpStocks.filter(
@@ -576,6 +637,13 @@ export default function App() {
 
                 {activeMarketTab === "limitup" && (
                   <div className="limitup-table">
+                    <p className="market-strip-meta">
+                      {limitUpError
+                        ? `数据源异常：${limitUpError}`
+                        : limitUpLoading
+                          ? "正在获取真实涨停池数据..."
+                          : `数据来源：东方财富涨停池 · ${limitUpUpdatedAt} 更新`}
+                    </p>
                     <div className="limitup-summary-grid">
                       <div className="limitup-summary-card">
                         <span>连板高度</span>
@@ -613,8 +681,8 @@ export default function App() {
                             label="股票"
                             value={
                               <>
-                            <strong>{stock.name}</strong>
-                            <small>{stock.code}</small>
+                                <strong>{stock.name}</strong>
+                                <small>{stock.code}</small>
                               </>
                             }
                           />
@@ -636,6 +704,14 @@ export default function App() {
                           <FieldValue label="股票行业" value={stock.industry} />
                         </div>
                       ))}
+                      {!limitUpLoading && limitUpStocks.length === 0 && (
+                        <div className="limitup-row">
+                          <strong>暂无涨停池数据</strong>
+                          <span className="topbar-note">
+                            当前没有可展示的真实涨停池记录，可能是非交易时段或数据源暂时不可用。
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}

@@ -81,6 +81,7 @@ export interface LimitUpStock {
   name: string;
   price: number;
   limitUpCount: number;
+  consecutiveBoardCount: number;
   openBoardCount: number;
   sealAmount: string;
   firstLimitUpTime: string;
