@@ -811,12 +811,6 @@ h2 {
   padding: 0.75rem 1rem;
 }
 
-.limitup-board-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px;
-}
-
 .limitup-board-timeline {
   display: grid;
   gap: 16px;
@@ -1743,7 +1737,6 @@ h2 {
     grid-template-columns: 1fr 1fr;
   }
 
-  .limitup-board-grid,
   .limitup-board-focus {
     grid-template-columns: 1fr;
   }

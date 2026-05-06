@@ -1,12 +1,10 @@
 import { ChangeEvent, DragEvent, ReactNode, useEffect, useMemo, useState } from "react";
 import {
   dataSources,
-  fundFlowBoards,
   holdings,
   marketBreadth,
   marketEvents,
   riskSignals,
-  sectorBoards,
   thesisRecords,
   tradeRecords
 } from "./data/mock";
@@ -24,8 +22,7 @@ type NavKey =
   | "us";
 
 type AiTabKey = "multimodal" | "strategy";
-type MarketTabKey = "limitup" | "heat" | "turnover" | "boards";
-type InsightTabKey = "sectors" | "funds" | "ai";
+type MarketTabKey = "limitup" | "heat" | "turnover";
 type PortfolioTabKey = "holdings" | "trades";
 type HomeSubpageKey = "overview" | "events";
 type PolicyMaterial = {
@@ -166,25 +163,6 @@ function totalCostValue(items: Holding[]) {
   return items.reduce((sum, item) => sum + item.shares * item.cost, 0);
 }
 
-function aiSummary(items: Holding[]) {
-  const gainers = items.filter((item) => item.dailyChange > 0).length;
-  const losers = items.length - gainers;
-  const dominantTheme = items
-    .flatMap((item) => item.tags)
-    .reduce<Record<string, number>>((acc, tag) => {
-      acc[tag] = (acc[tag] ?? 0) + 1;
-      return acc;
-    }, {});
-
-  const topTheme = Object.entries(dominantTheme).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "均衡";
-
-  if (losers > gainers) {
-    return `AI 判断当前组合处于压力区，主要拖累来自高波动板块。当前最显著的组合标签是“${topTheme}”，建议配合仓位纪律处理回撤。`;
-  }
-
-  return `AI 判断当前组合仍有韧性，优势来自核心资产和周期配置并存。当前最显著的组合标签是“${topTheme}”，可以继续做结构优化而不是频繁换仓。`;
-}
-
 function PlaceholderSection({
   title,
   summary,
@@ -257,7 +235,6 @@ export default function App() {
   const [activeHomeSubpage, setActiveHomeSubpage] = useState<HomeSubpageKey>("overview");
   const [activeAiTab, setActiveAiTab] = useState<AiTabKey>("multimodal");
   const [activeMarketTab, setActiveMarketTab] = useState<MarketTabKey>("limitup");
-  const [activeInsightTab, setActiveInsightTab] = useState<InsightTabKey>("sectors");
   const [activePortfolioTab, setActivePortfolioTab] = useState<PortfolioTabKey>("holdings");
   const [aiLinkInput, setAiLinkInput] = useState("");
   const [aiNoteInput, setAiNoteInput] = useState("重点判断材料里的产业催化是否能转化为真实投资主线。");
@@ -288,10 +265,6 @@ export default function App() {
   const costValue = useMemo(() => totalCostValue(portfolio), [portfolio]);
   const pnl = marketValue - costValue;
   const pnlPercent = (pnl / costValue) * 100;
-
-  const bestHolding = useMemo(() => {
-    return [...portfolio].sort((a, b) => b.dailyChange - a.dailyChange)[0];
-  }, [portfolio]);
 
   const riskScore = useMemo(() => {
     return Math.round(
@@ -720,13 +693,6 @@ export default function App() {
                   >
                     成交额
                   </button>
-                  <button
-                    type="button"
-                    className={`subnav-btn ${activeMarketTab === "boards" ? "active" : ""}`}
-                    onClick={() => setActiveMarketTab("boards")}
-                  >
-                    板块
-                  </button>
                 </div>
 
                 {activeMarketTab === "heat" && (
@@ -761,334 +727,193 @@ export default function App() {
                 )}
 
                 {activeMarketTab === "limitup" && (
-                  selectedLimitUpBoardData ? (
-                    <div className="limitup-table limitup-detail-page">
-                      <div className="limitup-detail-head">
-                        <div>
-                          <p className="section-kicker">Board Detail</p>
-                          <h3>{selectedLimitUpBoardData.name}</h3>
-                          <p className="market-strip-meta">
-                            数据来源：东方财富涨停池 · {limitUpUpdatedAt} 更新
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          className="secondary limitup-back-btn"
-                          onClick={() => setSelectedLimitUpBoard(null)}
-                        >
-                          返回涨停板总览
-                        </button>
+                  <div className="limitup-table">
+                    <p className="market-strip-meta">
+                      {limitUpError
+                        ? `数据源异常：${limitUpError}`
+                        : limitUpLoading
+                          ? "正在获取真实涨停池数据..."
+                          : `数据来源：东方财富涨停池 · ${limitUpUpdatedAt} 更新`}
+                    </p>
+                    <div className="limitup-summary-grid">
+                      <div className="limitup-summary-card">
+                        <span>连板高度</span>
+                        <strong>{maxLimitUpHeight} 板</strong>
                       </div>
-                      <div className="limitup-board-focus">
-                        <div className="limitup-board-focus-card">
-                          <span>板块家数</span>
-                          <strong>{selectedLimitUpBoardData.stocks.length} 家</strong>
-                        </div>
-                        <div className="limitup-board-focus-card">
-                          <span>板块高度</span>
-                          <strong>{selectedLimitUpBoardData.maxBoardHeight} 板</strong>
-                        </div>
-                        <div className="limitup-board-focus-card">
-                          <span>连板家数</span>
-                          <strong>{selectedLimitUpBoardData.consecutiveBoardCount} 家</strong>
-                        </div>
-                        <div className="limitup-board-focus-card">
-                          <span>首板家数</span>
-                          <strong>{selectedLimitUpBoardData.firstBoardCount} 家</strong>
-                        </div>
+                      <div className="limitup-summary-card">
+                        <span>开板次数</span>
+                        <strong>{totalOpenBoardCount} 次</strong>
                       </div>
-                      <div className="table-scroll">
-                        <div className="limitup-head">
-                          <span>股票</span>
-                          <span>价格</span>
-                          <span>涨停次数</span>
-                          <span>首次涨停</span>
-                          <span>开板次数</span>
-                          <span>封单额</span>
-                          <span>封单强度</span>
-                          <span>涨停原因</span>
-                        </div>
-                        {selectedLimitUpBoardData.stocks.map((stock) => (
-                          <div className="limitup-row" key={stock.code}>
-                            <FieldValue
-                              label="股票"
-                              value={
-                                <>
-                                  <strong>{stock.name}</strong>
-                                  <small>{stock.code}</small>
-                                </>
-                              }
-                            />
-                            <FieldValue label="价格" value={currency(stock.price)} />
-                            <FieldValue label="涨停次数" value={`${stock.limitUpCount} 次`} />
-                            <FieldValue label="首次涨停" value={stock.firstLimitUpTime} />
-                            <FieldValue label="开板次数" value={`${stock.openBoardCount} 次`} />
-                            <FieldValue label="封单额" value={stock.sealAmount} />
-                            <FieldValue label="封单强度" value={stock.sealStrength} />
-                            <FieldValue label="涨停原因" value={stock.reason} />
-                          </div>
-                        ))}
-                        {!limitUpLoading && selectedLimitUpBoardData.stocks.length === 0 && (
-                          <div className="limitup-row">
-                            <strong>该板块暂无涨停股</strong>
-                            <span className="topbar-note">当前板块筛选下没有可展示的记录。</span>
-                          </div>
-                        )}
+                      <div className="limitup-summary-card">
+                        <span>首板家数</span>
+                        <strong>{firstBoardCount} 家</strong>
+                      </div>
+                      <div className="limitup-summary-card">
+                        <span>连板家数</span>
+                        <strong>{consecutiveBoardCount} 家</strong>
                       </div>
                     </div>
-                  ) : (
-                    <div className="limitup-table">
-                      <p className="market-strip-meta">
-                        {limitUpError
-                          ? `数据源异常：${limitUpError}`
-                          : limitUpLoading
-                            ? "正在获取真实涨停池数据..."
-                            : `数据来源：东方财富涨停池 · ${limitUpUpdatedAt} 更新`}
-                      </p>
-                      <div className="limitup-summary-grid">
-                        <div className="limitup-summary-card">
-                          <span>连板高度</span>
-                          <strong>{maxLimitUpHeight} 板</strong>
-                        </div>
-                        <div className="limitup-summary-card">
-                          <span>开板次数</span>
-                          <strong>{totalOpenBoardCount} 次</strong>
-                        </div>
-                        <div className="limitup-summary-card">
-                          <span>首板家数</span>
-                          <strong>{firstBoardCount} 家</strong>
-                        </div>
-                        <div className="limitup-summary-card">
-                          <span>连板家数</span>
-                          <strong>{consecutiveBoardCount} 家</strong>
-                        </div>
+                    <div className="table-scroll">
+                      <div className="limitup-head">
+                        <span>股票</span>
+                        <span>价格</span>
+                        <span>涨停次数</span>
+                        <span>首次涨停</span>
+                        <span>开板次数</span>
+                        <span>封单额</span>
+                        <span>封单强度</span>
+                        <span>涨停原因</span>
                       </div>
-                      <div className="limitup-board-panel">
-                        <div className="limitup-board-panel-head">
-                          <div>
-                            <span className="section-kicker">Board View</span>
-                            <h3>当日板块</h3>
-                          </div>
+                      {limitUpStocks.map((stock) => (
+                        <div className="limitup-row" key={stock.code}>
+                          <FieldValue
+                            label="股票"
+                            value={
+                              <>
+                                <strong>{stock.name}</strong>
+                                <small>{stock.code}</small>
+                              </>
+                            }
+                          />
+                          <FieldValue label="价格" value={currency(stock.price)} />
+                          <FieldValue label="涨停次数" value={`${stock.limitUpCount} 次`} />
+                          <FieldValue label="首次涨停" value={stock.firstLimitUpTime} />
+                          <FieldValue label="开板次数" value={`${stock.openBoardCount} 次`} />
+                          <FieldValue label="封单额" value={stock.sealAmount} />
+                          <FieldValue label="封单强度" value={stock.sealStrength} />
+                          <FieldValue label="涨停原因" value={stock.reason} />
+                        </div>
+                      ))}
+                      {!limitUpLoading && limitUpStocks.length === 0 && (
+                        <div className="limitup-row">
+                          <strong>暂无涨停池数据</strong>
                           <span className="topbar-note">
-                            点击任意板块查看该方向的独立股票列表页面
+                            当前没有可展示的真实涨停池记录，可能是非交易时段或数据源暂时不可用。
                           </span>
                         </div>
-                        <div className="limitup-board-timeline">
-                          <div className="limitup-board-track">
-                            <div className="limitup-board-track-line" />
-                            {limitUpBoardTimeline.map((board) => (
-                              <button
-                                key={board.name}
-                                type="button"
-                                className={`limitup-board-node lane-${board.lane} ${board.sealStrength}`}
-                                style={{ left: `${board.progress}%` }}
-                                onClick={() => setSelectedLimitUpBoard(board.name)}
-                              >
-                                <span className="limitup-board-node-time">{board.firstLimitUpTime}</span>
-                                <span className="limitup-board-node-label">{board.name}</span>
-                                <span className="limitup-board-node-meta">
-                                  {board.stocks.length} 家 / {board.maxBoardHeight} 板
-                                </span>
-                              </button>
-                            ))}
-                            <div className="limitup-board-axis">
-                              <span>09:25</span>
-                              <span>10:30</span>
-                              <span>11:30 / 13:00</span>
-                              <span>14:00</span>
-                              <span>15:00</span>
-                            </div>
-                          </div>
-                          <div className="limitup-board-grid">
-                            {limitUpBoards.map((board) => (
-                              <button
-                                key={board.name}
-                                type="button"
-                                className="limitup-board-card"
-                                onClick={() => setSelectedLimitUpBoard(board.name)}
-                              >
-                                <div className="limitup-board-card-head">
-                                  <strong>{board.name}</strong>
-                                  <span>{board.stocks.length} 家</span>
-                                </div>
-                                <div className="limitup-board-card-metrics">
-                                  <span>连板高度 {board.maxBoardHeight} 板</span>
-                                  <span>连板 {board.consecutiveBoardCount} 家</span>
-                                  <span>首板 {board.firstBoardCount} 家</span>
-                                </div>
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="table-scroll">
-                        <div className="limitup-head">
-                          <span>股票</span>
-                          <span>价格</span>
-                          <span>涨停次数</span>
-                          <span>首次涨停</span>
-                          <span>开板次数</span>
-                          <span>封单额</span>
-                          <span>封单强度</span>
-                          <span>涨停原因</span>
-                        </div>
-                        {limitUpStocks.map((stock) => (
-                          <div className="limitup-row" key={stock.code}>
-                            <FieldValue
-                              label="股票"
-                              value={
-                                <>
-                                  <strong>{stock.name}</strong>
-                                  <small>{stock.code}</small>
-                                </>
-                              }
-                            />
-                            <FieldValue label="价格" value={currency(stock.price)} />
-                            <FieldValue label="涨停次数" value={`${stock.limitUpCount} 次`} />
-                            <FieldValue label="首次涨停" value={stock.firstLimitUpTime} />
-                            <FieldValue label="开板次数" value={`${stock.openBoardCount} 次`} />
-                            <FieldValue label="封单额" value={stock.sealAmount} />
-                            <FieldValue label="封单强度" value={stock.sealStrength} />
-                            <FieldValue label="涨停原因" value={stock.reason} />
-                          </div>
-                        ))}
-                        {!limitUpLoading && limitUpStocks.length === 0 && (
-                          <div className="limitup-row">
-                            <strong>暂无涨停池数据</strong>
-                            <span className="topbar-note">
-                              当前没有可展示的真实涨停池记录，可能是非交易时段或数据源暂时不可用。
-                            </span>
-                          </div>
-                        )}
-                      </div>
+                      )}
                     </div>
-                  )
+                  </div>
                 )}
+              </article>
 
-                {activeMarketTab === "boards" && (
-                  <div className="embedded-insight">
-                    <div className="subnav-row market-subnav insight-subnav">
-                      <button
-                        type="button"
-                        className={`subnav-btn ${activeInsightTab === "sectors" ? "active" : ""}`}
-                        onClick={() => setActiveInsightTab("sectors")}
-                      >
-                        当日板块
-                      </button>
-                      <button
-                        type="button"
-                        className={`subnav-btn ${activeInsightTab === "funds" ? "active" : ""}`}
-                        onClick={() => setActiveInsightTab("funds")}
-                      >
-                        资金板块
-                      </button>
-                      <button
-                        type="button"
-                        className={`subnav-btn ${activeInsightTab === "ai" ? "active" : ""}`}
-                        onClick={() => setActiveInsightTab("ai")}
-                      >
-                        AI盘面结论
-                      </button>
+              <article className="card wide board-trend-card">
+                <div className="card-head">
+                  <div>
+                    <p className="section-kicker">Board View</p>
+                    <h2>{selectedLimitUpBoardData ? selectedLimitUpBoardData.name : "当日板块"}</h2>
+                  </div>
+                  {selectedLimitUpBoardData ? (
+                    <button
+                      type="button"
+                      className="secondary limitup-back-btn"
+                      onClick={() => setSelectedLimitUpBoard(null)}
+                    >
+                      返回板块趋势图
+                    </button>
+                  ) : (
+                    <div className="topbar-note">点击趋势图中的板块，进入该方向的二级股票列表页</div>
+                  )}
+                </div>
+
+                {selectedLimitUpBoardData ? (
+                  <div className="limitup-table limitup-detail-page">
+                    <p className="market-strip-meta">
+                      数据来源：东方财富涨停池 · {limitUpUpdatedAt} 更新
+                    </p>
+                    <div className="limitup-board-focus">
+                      <div className="limitup-board-focus-card">
+                        <span>板块家数</span>
+                        <strong>{selectedLimitUpBoardData.stocks.length} 家</strong>
+                      </div>
+                      <div className="limitup-board-focus-card">
+                        <span>板块高度</span>
+                        <strong>{selectedLimitUpBoardData.maxBoardHeight} 板</strong>
+                      </div>
+                      <div className="limitup-board-focus-card">
+                        <span>连板家数</span>
+                        <strong>{selectedLimitUpBoardData.consecutiveBoardCount} 家</strong>
+                      </div>
+                      <div className="limitup-board-focus-card">
+                        <span>首板家数</span>
+                        <strong>{selectedLimitUpBoardData.firstBoardCount} 家</strong>
+                      </div>
                     </div>
-
-                    {activeInsightTab === "sectors" && (
-                      <div className="board-list">
-                        {sectorBoards.map((board) => (
-                          <div className="board-item board-item-rich" key={board.id}>
-                            <div className="board-main">
-                              <div className="board-summary-row">
-                                <div className="board-title-group">
-                                  <div className="board-title-row">
-                                    <strong>{board.name}</strong>
-                                    <span
-                                      className={
-                                        board.change >= 0 ? "up board-change" : "down board-change"
-                                      }
-                                    >
-                                      {percent(board.change)}
-                                    </span>
-                                  </div>
-                                  <div className="board-leader-inline">
-                                    <span>板块龙头</span>
-                                    <strong>{board.leader}</strong>
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="sector-stock-list">
-                                {board.stocks.map((stock) => (
-                                  <div
-                                    className="sector-stock-card"
-                                    key={`${board.id}-${stock.role}-${stock.code}`}
-                                  >
-                                    <div className="sector-stock-head">
-                                      <span className="sector-stock-role">{stock.role}</span>
-                                      <div>
-                                        <strong>{stock.name}</strong>
-                                        <small>{stock.code}</small>
-                                      </div>
-                                    </div>
-                                    <div className="sector-stock-tags">
-                                      {stock.otherIndustries.map((industry) => (
-                                        <span className="tag" key={`${stock.code}-${industry}`}>
-                                          {industry}
-                                        </span>
-                                      ))}
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
+                    <div className="table-scroll">
+                      <div className="limitup-head">
+                        <span>股票</span>
+                        <span>价格</span>
+                        <span>涨停次数</span>
+                        <span>首次涨停</span>
+                        <span>开板次数</span>
+                        <span>封单额</span>
+                        <span>封单强度</span>
+                        <span>涨停原因</span>
                       </div>
-                    )}
-
-                    {activeInsightTab === "funds" && (
-                      <div className="board-list">
-                        {fundFlowBoards.map((board) => (
-                          <div className="board-item" key={board.name}>
-                            <div>
-                              <strong>{board.name}</strong>
-                              <p>{board.note}</p>
-                            </div>
-                            <div className="board-side">
-                              <span className={board.strength}>{board.inflow}</span>
-                              <p>
-                                {board.strength === "strong"
-                                  ? "主力净流入"
-                                  : board.strength === "weak"
-                                    ? "主力净流出"
-                                    : "观察中"}
-                              </p>
-                            </div>
-                          </div>
+                      {selectedLimitUpBoardData.stocks.map((stock) => (
+                        <div className="limitup-row" key={stock.code}>
+                          <FieldValue
+                            label="股票"
+                            value={
+                              <>
+                                <strong>{stock.name}</strong>
+                                <small>{stock.code}</small>
+                              </>
+                            }
+                          />
+                          <FieldValue label="价格" value={currency(stock.price)} />
+                          <FieldValue label="涨停次数" value={`${stock.limitUpCount} 次`} />
+                          <FieldValue label="首次涨停" value={stock.firstLimitUpTime} />
+                          <FieldValue label="开板次数" value={`${stock.openBoardCount} 次`} />
+                          <FieldValue label="封单额" value={stock.sealAmount} />
+                          <FieldValue label="封单强度" value={stock.sealStrength} />
+                          <FieldValue label="涨停原因" value={stock.reason} />
+                        </div>
+                      ))}
+                      {!limitUpLoading && selectedLimitUpBoardData.stocks.length === 0 && (
+                        <div className="limitup-row">
+                          <strong>该板块暂无涨停股</strong>
+                          <span className="topbar-note">当前板块筛选下没有可展示的记录。</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="limitup-board-panel">
+                    <p className="market-strip-meta">
+                      {limitUpError
+                        ? `数据源异常：${limitUpError}`
+                        : limitUpLoading
+                          ? "正在获取真实板块趋势数据..."
+                          : `数据来源：东方财富涨停池 · ${limitUpUpdatedAt} 更新`}
+                    </p>
+                    <div className="limitup-board-timeline">
+                      <div className="limitup-board-track">
+                        <div className="limitup-board-track-line" />
+                        {limitUpBoardTimeline.map((board) => (
+                          <button
+                            key={board.name}
+                            type="button"
+                            className={`limitup-board-node lane-${board.lane} ${board.sealStrength}`}
+                            style={{ left: `${board.progress}%` }}
+                            onClick={() => setSelectedLimitUpBoard(board.name)}
+                          >
+                            <span className="limitup-board-node-time">{board.firstLimitUpTime}</span>
+                            <span className="limitup-board-node-label">{board.name}</span>
+                            <span className="limitup-board-node-meta">
+                              {board.stocks.length} 家 / {board.maxBoardHeight} 板
+                            </span>
+                          </button>
                         ))}
-                      </div>
-                    )}
-
-                    {activeInsightTab === "ai" && (
-                      <div className="ai-brief">
-                        <p>{aiSummary(portfolio)}</p>
-                        <div className="hero-grid compact-grid">
-                          <div>
-                            <strong>{currency(marketValue)}</strong>
-                            <span>持仓市值</span>
-                          </div>
-                          <div>
-                            <strong>{percent(pnlPercent)}</strong>
-                            <span>累计收益</span>
-                          </div>
-                          <div>
-                            <strong>{bestHolding.name}</strong>
-                            <span>今日相对强势</span>
-                          </div>
-                          <div>
-                            <strong>{dataSources.length}</strong>
-                            <span>数据源预留</span>
-                          </div>
+                        <div className="limitup-board-axis">
+                          <span>09:25</span>
+                          <span>10:30</span>
+                          <span>11:30 / 13:00</span>
+                          <span>14:00</span>
+                          <span>15:00</span>
                         </div>
                       </div>
-                    )}
+                    </div>
                   </div>
                 )}
               </article>
