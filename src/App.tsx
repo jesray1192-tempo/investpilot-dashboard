@@ -25,6 +25,16 @@ type AiTabKey = "multimodal" | "strategy";
 type MarketTabKey = "limitup" | "heat" | "turnover";
 type PortfolioTabKey = "holdings" | "trades";
 type HomeSubpageKey = "overview" | "events" | "boards";
+type LimitUpSortField =
+  | "name"
+  | "price"
+  | "limitUpCount"
+  | "firstLimitUpTime"
+  | "openBoardCount"
+  | "sealAmount"
+  | "sealStrength"
+  | "reason";
+type SortDirection = "asc" | "desc";
 type PolicyMaterial = {
   name: string;
   kind: string;
@@ -50,6 +60,107 @@ function FieldValue({
       <small className="field-label">{label}</small>
       <span className="field-value">{value}</span>
     </span>
+  );
+}
+
+function parseLimitUpTime(time: string) {
+  const [hourText = "0", minuteText = "0"] = time.split(":");
+  const hour = Number.parseInt(hourText, 10);
+  const minute = Number.parseInt(minuteText, 10);
+
+  if (Number.isNaN(hour) || Number.isNaN(minute)) {
+    return 0;
+  }
+
+  return hour * 60 + minute;
+}
+
+function parseSealAmount(sealAmount: string) {
+  return Number.parseFloat(sealAmount.replace("亿", "")) || 0;
+}
+
+function parseSealStrength(sealStrength: string) {
+  const strengthMap: Record<string, number> = {
+    极强: 4,
+    强: 3,
+    中强: 2,
+    中: 1,
+    弱: 0
+  };
+
+  return strengthMap[sealStrength] ?? -1;
+}
+
+function sortLimitUpStocks(
+  stocks: LimitUpStock[],
+  sortField: LimitUpSortField,
+  sortDirection: SortDirection
+) {
+  const directionFactor = sortDirection === "asc" ? 1 : -1;
+
+  return [...stocks].sort((left, right) => {
+    let comparison = 0;
+
+    switch (sortField) {
+      case "name":
+        comparison = left.name.localeCompare(right.name, "zh-CN");
+        break;
+      case "price":
+        comparison = left.price - right.price;
+        break;
+      case "limitUpCount":
+        comparison = left.limitUpCount - right.limitUpCount;
+        break;
+      case "firstLimitUpTime":
+        comparison = parseLimitUpTime(left.firstLimitUpTime) - parseLimitUpTime(right.firstLimitUpTime);
+        break;
+      case "openBoardCount":
+        comparison = left.openBoardCount - right.openBoardCount;
+        break;
+      case "sealAmount":
+        comparison = parseSealAmount(left.sealAmount) - parseSealAmount(right.sealAmount);
+        break;
+      case "sealStrength":
+        comparison = parseSealStrength(left.sealStrength) - parseSealStrength(right.sealStrength);
+        break;
+      case "reason":
+        comparison = left.reason.localeCompare(right.reason, "zh-CN");
+        break;
+      default:
+        comparison = 0;
+    }
+
+    if (comparison === 0) {
+      comparison = left.code.localeCompare(right.code, "zh-CN");
+    }
+
+    return comparison * directionFactor;
+  });
+}
+
+function SortableLimitUpHeader({
+  label,
+  field,
+  activeField,
+  direction,
+  onToggle
+}: {
+  label: string;
+  field: LimitUpSortField;
+  activeField: LimitUpSortField;
+  direction: SortDirection;
+  onToggle: (field: LimitUpSortField) => void;
+}) {
+  const isActive = activeField === field;
+
+  return (
+    <button type="button" className={`sort-head-btn ${isActive ? "active" : ""}`} onClick={() => onToggle(field)}>
+      <span>{label}</span>
+      <span className="sort-head-arrows" aria-hidden="true">
+        <span className={isActive && direction === "asc" ? "active" : ""}>▴</span>
+        <span className={isActive && direction === "desc" ? "active" : ""}>▾</span>
+      </span>
+    </button>
   );
 }
 
@@ -268,6 +379,8 @@ export default function App() {
   const [limitUpLoading, setLimitUpLoading] = useState(true);
   const [limitUpError, setLimitUpError] = useState("");
   const [limitUpUpdatedAt, setLimitUpUpdatedAt] = useState("");
+  const [limitUpSortField, setLimitUpSortField] = useState<LimitUpSortField>("firstLimitUpTime");
+  const [limitUpSortDirection, setLimitUpSortDirection] = useState<SortDirection>("asc");
   const [selectedLimitUpBoard, setSelectedLimitUpBoard] = useState<string | null>(
     initialHashState.boardName
   );
@@ -438,6 +551,21 @@ export default function App() {
     () => limitUpBoards.find((board) => board.name === selectedLimitUpBoard) ?? null,
     [limitUpBoards, selectedLimitUpBoard]
   );
+  const sortedLimitUpStocks = useMemo(
+    () => sortLimitUpStocks(limitUpStocks, limitUpSortField, limitUpSortDirection),
+    [limitUpSortDirection, limitUpSortField, limitUpStocks]
+  );
+  const sortedSelectedBoardStocks = useMemo(
+    () =>
+      selectedLimitUpBoardData
+        ? sortLimitUpStocks(
+            selectedLimitUpBoardData.stocks,
+            limitUpSortField,
+            limitUpSortDirection
+          )
+        : [],
+    [limitUpSortDirection, limitUpSortField, selectedLimitUpBoardData]
+  );
 
   const visibleLimitUpBoards = useMemo(() => limitUpBoards.slice(0, 4), [limitUpBoards]);
 
@@ -514,6 +642,16 @@ export default function App() {
     setActiveHomeSubpage(nextSubpage);
     setSelectedLimitUpBoard(nextBoard);
     updateHash("home", nextSubpage, nextBoard);
+  }
+
+  function handleLimitUpSort(field: LimitUpSortField) {
+    if (limitUpSortField === field) {
+      setLimitUpSortDirection((current) => (current === "asc" ? "desc" : "asc"));
+      return;
+    }
+
+    setLimitUpSortField(field);
+    setLimitUpSortDirection(field === "reason" || field === "name" ? "asc" : "desc");
   }
 
   function mergeAssets(nextAssets: UploadAsset[]) {
@@ -794,16 +932,64 @@ export default function App() {
                     </div>
                     <div className="table-scroll">
                       <div className="limitup-head">
-                        <span>股票</span>
-                        <span>价格</span>
-                        <span>涨停次数</span>
-                        <span>首次涨停</span>
-                        <span>开板次数</span>
-                        <span>封单额</span>
-                        <span>封单强度</span>
-                        <span>涨停原因</span>
+                        <SortableLimitUpHeader
+                          label="股票"
+                          field="name"
+                          activeField={limitUpSortField}
+                          direction={limitUpSortDirection}
+                          onToggle={handleLimitUpSort}
+                        />
+                        <SortableLimitUpHeader
+                          label="价格"
+                          field="price"
+                          activeField={limitUpSortField}
+                          direction={limitUpSortDirection}
+                          onToggle={handleLimitUpSort}
+                        />
+                        <SortableLimitUpHeader
+                          label="涨停次数"
+                          field="limitUpCount"
+                          activeField={limitUpSortField}
+                          direction={limitUpSortDirection}
+                          onToggle={handleLimitUpSort}
+                        />
+                        <SortableLimitUpHeader
+                          label="首次涨停"
+                          field="firstLimitUpTime"
+                          activeField={limitUpSortField}
+                          direction={limitUpSortDirection}
+                          onToggle={handleLimitUpSort}
+                        />
+                        <SortableLimitUpHeader
+                          label="开板次数"
+                          field="openBoardCount"
+                          activeField={limitUpSortField}
+                          direction={limitUpSortDirection}
+                          onToggle={handleLimitUpSort}
+                        />
+                        <SortableLimitUpHeader
+                          label="封单额"
+                          field="sealAmount"
+                          activeField={limitUpSortField}
+                          direction={limitUpSortDirection}
+                          onToggle={handleLimitUpSort}
+                        />
+                        <SortableLimitUpHeader
+                          label="封单强度"
+                          field="sealStrength"
+                          activeField={limitUpSortField}
+                          direction={limitUpSortDirection}
+                          onToggle={handleLimitUpSort}
+                        />
+                        <SortableLimitUpHeader
+                          label="涨停原因"
+                          field="reason"
+                          activeField={limitUpSortField}
+                          direction={limitUpSortDirection}
+                          onToggle={handleLimitUpSort}
+                        />
                       </div>
-                      {limitUpStocks.map((stock) => (
+                      {sortedLimitUpStocks.map((stock) => (
                         <div className="limitup-row" key={stock.code}>
                           <FieldValue
                             label="股票"
@@ -883,9 +1069,6 @@ export default function App() {
                       </button>
                     ))}
                   </div>
-                  {limitUpBoards.length > 4 && (
-                    <div className="topbar-note">当前展示前 4 个板块，点击“查看更多”进入完整列表页。</div>
-                  )}
                   {!limitUpLoading && limitUpBoards.length === 0 && (
                     <div className="limitup-empty-state">
                       <strong>暂无板块数据</strong>
@@ -1001,16 +1184,64 @@ export default function App() {
                   </div>
                   <div className="table-scroll">
                     <div className="limitup-head">
-                      <span>股票</span>
-                      <span>价格</span>
-                      <span>涨停次数</span>
-                      <span>首次涨停</span>
-                      <span>开板次数</span>
-                      <span>封单额</span>
-                      <span>封单强度</span>
-                      <span>涨停原因</span>
+                      <SortableLimitUpHeader
+                        label="股票"
+                        field="name"
+                        activeField={limitUpSortField}
+                        direction={limitUpSortDirection}
+                        onToggle={handleLimitUpSort}
+                      />
+                      <SortableLimitUpHeader
+                        label="价格"
+                        field="price"
+                        activeField={limitUpSortField}
+                        direction={limitUpSortDirection}
+                        onToggle={handleLimitUpSort}
+                      />
+                      <SortableLimitUpHeader
+                        label="涨停次数"
+                        field="limitUpCount"
+                        activeField={limitUpSortField}
+                        direction={limitUpSortDirection}
+                        onToggle={handleLimitUpSort}
+                      />
+                      <SortableLimitUpHeader
+                        label="首次涨停"
+                        field="firstLimitUpTime"
+                        activeField={limitUpSortField}
+                        direction={limitUpSortDirection}
+                        onToggle={handleLimitUpSort}
+                      />
+                      <SortableLimitUpHeader
+                        label="开板次数"
+                        field="openBoardCount"
+                        activeField={limitUpSortField}
+                        direction={limitUpSortDirection}
+                        onToggle={handleLimitUpSort}
+                      />
+                      <SortableLimitUpHeader
+                        label="封单额"
+                        field="sealAmount"
+                        activeField={limitUpSortField}
+                        direction={limitUpSortDirection}
+                        onToggle={handleLimitUpSort}
+                      />
+                      <SortableLimitUpHeader
+                        label="封单强度"
+                        field="sealStrength"
+                        activeField={limitUpSortField}
+                        direction={limitUpSortDirection}
+                        onToggle={handleLimitUpSort}
+                      />
+                      <SortableLimitUpHeader
+                        label="涨停原因"
+                        field="reason"
+                        activeField={limitUpSortField}
+                        direction={limitUpSortDirection}
+                        onToggle={handleLimitUpSort}
+                      />
                     </div>
-                    {selectedLimitUpBoardData.stocks.map((stock) => (
+                    {sortedSelectedBoardStocks.map((stock) => (
                       <div className="limitup-row" key={stock.code}>
                         <FieldValue
                           label="股票"

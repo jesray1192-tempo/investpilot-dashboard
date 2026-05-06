@@ -931,6 +931,46 @@ h2 {
   letter-spacing: 0.08em;
 }
 
+.sort-head-btn {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  cursor: pointer;
+  text-transform: inherit;
+  letter-spacing: inherit;
+}
+
+.sort-head-btn:hover {
+  color: rgba(242, 239, 232, 0.86);
+}
+
+.sort-head-btn.active {
+  color: rgba(242, 239, 232, 0.9);
+}
+
+.sort-head-arrows {
+  display: inline-grid;
+  gap: 1px;
+  line-height: 0.78;
+}
+
+.sort-head-arrows span {
+  color: rgba(242, 239, 232, 0.28);
+  font-size: 0.64rem;
+  transition: color 0.18s ease, transform 0.18s ease;
+}
+
+.sort-head-arrows span.active {
+  color: #e9b487;
+  transform: scale(1.08);
+}
+
 .limitup-row {
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.06);
