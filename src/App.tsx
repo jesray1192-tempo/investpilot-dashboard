@@ -10,7 +10,8 @@ import {
 } from "./data/mock";
 import { fetchLiveLimitUpPool } from "./services/limitUpPool";
 import { fetchLiveMarketIndices } from "./services/marketIndices";
-import { Holding, LimitUpStock, MarketIndex } from "./types";
+import { fetchLiveStockDetail, fetchLiveStockTrend } from "./services/stockDetail";
+import { Holding, LimitUpStock, MarketIndex, StockDetail, StockTrendPoint } from "./types";
 
 type NavKey =
   | "home"
@@ -24,7 +25,7 @@ type NavKey =
 type AiTabKey = "multimodal" | "strategy";
 type MarketTabKey = "limitup" | "heat" | "turnover";
 type PortfolioTabKey = "holdings" | "trades";
-type HomeSubpageKey = "overview" | "events" | "boards";
+type HomeSubpageKey = "overview" | "events" | "boards" | "stock";
 type LimitUpSortField =
   | "name"
   | "price"
@@ -35,6 +36,7 @@ type LimitUpSortField =
   | "sealStrength"
   | "reason";
 type SortDirection = "asc" | "desc";
+type StockTrendRange = 1 | 5;
 type PolicyMaterial = {
   name: string;
   kind: string;
@@ -175,30 +177,49 @@ function parseAppHash(hash: string): {
   nav: NavKey;
   homeSubpage: HomeSubpageKey;
   boardName: string | null;
+  stockCode: string | null;
+  stockBoardName: string | null;
 } {
   const normalized = hash.replace(/^#/, "").trim();
 
   if (!normalized) {
-    return { nav: "home", homeSubpage: "overview", boardName: null };
+    return { nav: "home", homeSubpage: "overview", boardName: null, stockCode: null, stockBoardName: null };
   }
 
   const [navSegment = "home", subpageSegment, ...restSegments] = normalized.split("/");
   const nav = navItems.find((item) => item.key === navSegment)?.key ?? "home";
 
   if (nav !== "home") {
-    return { nav, homeSubpage: "overview", boardName: null };
+    return { nav, homeSubpage: "overview", boardName: null, stockCode: null, stockBoardName: null };
   }
 
   if (subpageSegment === "events") {
-    return { nav: "home", homeSubpage: "events", boardName: null };
+    return { nav: "home", homeSubpage: "events", boardName: null, stockCode: null, stockBoardName: null };
   }
 
   if (subpageSegment === "boards") {
     const boardName = restSegments.length > 0 ? decodeURIComponent(restSegments.join("/")) : null;
-    return { nav: "home", homeSubpage: "boards", boardName };
+    return { nav: "home", homeSubpage: "boards", boardName, stockCode: null, stockBoardName: null };
   }
 
-  return { nav: "home", homeSubpage: "overview", boardName: null };
+  if (subpageSegment === "stocks") {
+    const [stockCodeSegment, boardToken, ...boardSegments] = restSegments;
+    const stockCode = stockCodeSegment ? decodeURIComponent(stockCodeSegment) : null;
+    const stockBoardName =
+      boardToken === "board" && boardSegments.length > 0
+        ? decodeURIComponent(boardSegments.join("/"))
+        : null;
+
+    return {
+      nav: "home",
+      homeSubpage: "stock",
+      boardName: stockBoardName,
+      stockCode,
+      stockBoardName
+    };
+  }
+
+  return { nav: "home", homeSubpage: "overview", boardName: null, stockCode: null, stockBoardName: null };
 }
 
 const navItems: NavItem[] = [
@@ -260,6 +281,48 @@ function currency(value: number) {
 
 function percent(value: number) {
   return `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
+}
+
+function formatLargeYi(value: number, suffix = "亿") {
+  if (!value) {
+    return "--";
+  }
+
+  const yi = value / 100000000;
+  return `${yi >= 100 ? yi.toFixed(0) : yi.toFixed(2)}${suffix}`;
+}
+
+function formatShareCount(value: number) {
+  if (!value) {
+    return "--";
+  }
+
+  return `${(value / 100000000).toFixed(2)}亿股`;
+}
+
+function formatVolumeInWanHands(value: number) {
+  if (!value) {
+    return "--";
+  }
+
+  return `${(value / 10000).toFixed(2)}万手`;
+}
+
+function formatPlainNumber(value: number | null, digits = 2) {
+  if (typeof value !== "number" || Number.isNaN(value)) {
+    return "--";
+  }
+
+  return value.toFixed(digits);
+}
+
+function formatTrendLabel(timestamp: string, days: StockTrendRange) {
+  const [dateText = "", timeText = ""] = timestamp.split(" ");
+  if (days === 1) {
+    return timeText.slice(0, 5);
+  }
+
+  return dateText.slice(5);
 }
 
 function formatCompactDate(value: number) {
@@ -384,6 +447,20 @@ export default function App() {
   const [selectedLimitUpBoard, setSelectedLimitUpBoard] = useState<string | null>(
     initialHashState.boardName
   );
+  const [selectedStockCode, setSelectedStockCode] = useState<string | null>(
+    initialHashState.stockCode
+  );
+  const [selectedStockBoardName, setSelectedStockBoardName] = useState<string | null>(
+    initialHashState.stockBoardName
+  );
+  const [stockTrendRange, setStockTrendRange] = useState<StockTrendRange>(1);
+  const [stockDetail, setStockDetail] = useState<StockDetail | null>(null);
+  const [stockDetailLoading, setStockDetailLoading] = useState(false);
+  const [stockDetailError, setStockDetailError] = useState("");
+  const [stockDetailUpdatedAt, setStockDetailUpdatedAt] = useState("");
+  const [stockTrendPoints, setStockTrendPoints] = useState<StockTrendPoint[]>([]);
+  const [stockTrendLoading, setStockTrendLoading] = useState(false);
+  const [stockTrendError, setStockTrendError] = useState("");
   const [portfolio] = useState(holdings);
   const marketValue = useMemo(() => totalMarketValue(portfolio), [portfolio]);
   const costValue = useMemo(() => totalCostValue(portfolio), [portfolio]);
@@ -568,6 +645,68 @@ export default function App() {
   );
 
   const visibleLimitUpBoards = useMemo(() => limitUpBoards.slice(0, 4), [limitUpBoards]);
+  const effectiveStockBoardName = selectedStockBoardName ?? stockDetail?.industry ?? null;
+  const relatedBoardData = useMemo(() => {
+    if (!effectiveStockBoardName) {
+      return null;
+    }
+
+    return limitUpBoards.find((board) => board.name === effectiveStockBoardName) ?? null;
+  }, [effectiveStockBoardName, limitUpBoards]);
+  const stockTrendStats = useMemo(() => {
+    if (stockTrendPoints.length === 0) {
+      return null;
+    }
+
+    const prices = stockTrendPoints.map((point) => point.price);
+    const minPrice = Math.min(...prices);
+    const maxPrice = Math.max(...prices);
+    const basePrice = stockDetail?.prevClose || stockTrendPoints[0]?.price || 0;
+    const spread = Math.max(maxPrice - minPrice, basePrice * 0.01, 0.01);
+    const top = Math.max(maxPrice, basePrice) + spread * 0.3;
+    const bottom = Math.min(minPrice, basePrice) - spread * 0.3;
+    const width = 720;
+    const height = 280;
+
+    const path = stockTrendPoints
+      .map((point, index) => {
+        const x =
+          stockTrendPoints.length === 1
+            ? width / 2
+            : (index / (stockTrendPoints.length - 1)) * width;
+        const y = height - ((point.price - bottom) / (top - bottom)) * height;
+        return `${index === 0 ? "M" : "L"} ${x.toFixed(2)} ${y.toFixed(2)}`;
+      })
+      .join(" ");
+
+    const avgPath = stockTrendPoints
+      .map((point, index) => {
+        const x =
+          stockTrendPoints.length === 1
+            ? width / 2
+            : (index / (stockTrendPoints.length - 1)) * width;
+        const y = height - ((point.averagePrice - bottom) / (top - bottom)) * height;
+        return `${index === 0 ? "M" : "L"} ${x.toFixed(2)} ${y.toFixed(2)}`;
+      })
+      .join(" ");
+
+    const tickIndexes = [0, Math.floor((stockTrendPoints.length - 1) / 2), stockTrendPoints.length - 1];
+    const ticks = tickIndexes.map((index) => ({
+      index,
+      label: formatTrendLabel(stockTrendPoints[index].timestamp, stockTrendRange)
+    }));
+
+    return {
+      width,
+      height,
+      top,
+      bottom,
+      basePrice,
+      path,
+      avgPath,
+      ticks
+    };
+  }, [stockDetail?.prevClose, stockTrendPoints, stockTrendRange]);
 
   const currentNav = navItems.find((item) => item.key === activeNav) ?? navItems[0];
   const homeHeadline = marketEvents[0];
@@ -610,6 +749,8 @@ export default function App() {
       setActiveNav(nextState.nav);
       setActiveHomeSubpage(nextState.homeSubpage);
       setSelectedLimitUpBoard(nextState.boardName);
+      setSelectedStockCode(nextState.stockCode);
+      setSelectedStockBoardName(nextState.stockBoardName);
     };
 
     window.addEventListener("hashchange", syncFromHash);
@@ -620,12 +761,111 @@ export default function App() {
     };
   }, []);
 
-  function updateHash(nextNav: NavKey, nextHomeSubpage: HomeSubpageKey, nextBoard: string | null) {
+  useEffect(() => {
+    if (activeHomeSubpage !== "stock" || !selectedStockCode) {
+      return;
+    }
+
+    let disposed = false;
+
+    const loadStockDetail = async () => {
+      try {
+        setStockDetailLoading(true);
+        setStockDetailError("");
+        const nextDetail = await fetchLiveStockDetail(selectedStockCode);
+
+        if (disposed) {
+          return;
+        }
+
+        setStockDetail(nextDetail);
+        if (!selectedStockBoardName) {
+          setSelectedStockBoardName(nextDetail.industry || null);
+        }
+        setStockDetailUpdatedAt(
+          new Intl.DateTimeFormat("zh-CN", {
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+            hour12: false
+          }).format(new Date())
+        );
+      } catch (error) {
+        if (disposed) {
+          return;
+        }
+
+        setStockDetailError(error instanceof Error ? error.message : "个股详情获取失败。");
+      } finally {
+        if (!disposed) {
+          setStockDetailLoading(false);
+        }
+      }
+    };
+
+    void loadStockDetail();
+
+    return () => {
+      disposed = true;
+    };
+  }, [activeHomeSubpage, selectedStockBoardName, selectedStockCode]);
+
+  useEffect(() => {
+    if (activeHomeSubpage !== "stock" || !selectedStockCode) {
+      return;
+    }
+
+    let disposed = false;
+
+    const loadStockTrend = async () => {
+      try {
+        setStockTrendLoading(true);
+        setStockTrendError("");
+        const nextTrend = await fetchLiveStockTrend(selectedStockCode, stockTrendRange);
+
+        if (disposed) {
+          return;
+        }
+
+        setStockTrendPoints(nextTrend);
+      } catch (error) {
+        if (disposed) {
+          return;
+        }
+
+        setStockTrendError(error instanceof Error ? error.message : "个股走势获取失败。");
+      } finally {
+        if (!disposed) {
+          setStockTrendLoading(false);
+        }
+      }
+    };
+
+    void loadStockTrend();
+
+    return () => {
+      disposed = true;
+    };
+  }, [activeHomeSubpage, selectedStockCode, stockTrendRange]);
+
+  function updateHash(
+    nextNav: NavKey,
+    nextHomeSubpage: HomeSubpageKey,
+    nextBoard: string | null,
+    nextStockCode: string | null = null,
+    nextStockBoardName: string | null = null
+  ) {
     const nextHash =
       nextNav !== "home"
         ? `#${nextNav}`
         : nextHomeSubpage === "events"
           ? "#home/events"
+          : nextHomeSubpage === "stock"
+            ? nextStockCode
+              ? nextStockBoardName
+                ? `#home/stocks/${encodeURIComponent(nextStockCode)}/board/${encodeURIComponent(nextStockBoardName)}`
+                : `#home/stocks/${encodeURIComponent(nextStockCode)}`
+              : "#home/overview"
           : nextHomeSubpage === "boards"
             ? nextBoard
               ? `#home/boards/${encodeURIComponent(nextBoard)}`
@@ -641,7 +881,18 @@ export default function App() {
     setActiveNav("home");
     setActiveHomeSubpage(nextSubpage);
     setSelectedLimitUpBoard(nextBoard);
-    updateHash("home", nextSubpage, nextBoard);
+    setSelectedStockCode(null);
+    setStockDetail(null);
+    setStockTrendPoints([]);
+    updateHash("home", nextSubpage, nextBoard, null, null);
+  }
+
+  function navigateStockDetail(code: string, boardName: string | null = null) {
+    setActiveNav("home");
+    setActiveHomeSubpage("stock");
+    setSelectedStockCode(code);
+    setSelectedStockBoardName(boardName);
+    updateHash("home", "stock", boardName, code, boardName);
   }
 
   function handleLimitUpSort(field: LimitUpSortField) {
@@ -723,6 +974,8 @@ export default function App() {
     if (nextNav !== "home") {
       setActiveHomeSubpage("overview");
       setSelectedLimitUpBoard(null);
+      setSelectedStockCode(null);
+      setSelectedStockBoardName(null);
       updateHash(nextNav, "overview", null);
       return;
     }
@@ -733,12 +986,16 @@ export default function App() {
   const topbarTitle =
     activeNav === "home" && activeHomeSubpage === "events"
       ? "事件与快讯"
+      : activeNav === "home" && activeHomeSubpage === "stock"
+        ? stockDetail?.name ?? selectedStockCode ?? "个股详情"
       : activeNav === "home" && activeHomeSubpage === "boards"
         ? selectedLimitUpBoardData?.name ?? "全部板块"
         : currentNav.label;
   const topbarDescription =
     activeNav === "home" && activeHomeSubpage === "events"
       ? "当天热点、快讯与情绪扰动列表"
+      : activeNav === "home" && activeHomeSubpage === "stock"
+        ? "实时行情、涨停原因与分时走势"
       : activeNav === "home" && activeHomeSubpage === "boards"
         ? selectedLimitUpBoardData
           ? "板块内涨停股票列表"
@@ -932,13 +1189,7 @@ export default function App() {
                     </div>
                     <div className="table-scroll">
                       <div className="limitup-head">
-                        <SortableLimitUpHeader
-                          label="股票"
-                          field="name"
-                          activeField={limitUpSortField}
-                          direction={limitUpSortDirection}
-                          onToggle={handleLimitUpSort}
-                        />
+                        <span>股票</span>
                         <SortableLimitUpHeader
                           label="价格"
                           field="price"
@@ -990,7 +1241,19 @@ export default function App() {
                         />
                       </div>
                       {sortedLimitUpStocks.map((stock) => (
-                        <div className="limitup-row" key={stock.code}>
+                        <div
+                          className="limitup-row limitup-row-clickable"
+                          key={stock.code}
+                          onClick={() => navigateStockDetail(stock.code)}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.preventDefault();
+                              navigateStockDetail(stock.code);
+                            }
+                          }}
+                        >
                           <FieldValue
                             label="股票"
                             value={
@@ -1184,13 +1447,7 @@ export default function App() {
                   </div>
                   <div className="table-scroll">
                     <div className="limitup-head">
-                      <SortableLimitUpHeader
-                        label="股票"
-                        field="name"
-                        activeField={limitUpSortField}
-                        direction={limitUpSortDirection}
-                        onToggle={handleLimitUpSort}
-                      />
+                      <span>股票</span>
                       <SortableLimitUpHeader
                         label="价格"
                         field="price"
@@ -1242,7 +1499,21 @@ export default function App() {
                       />
                     </div>
                     {sortedSelectedBoardStocks.map((stock) => (
-                      <div className="limitup-row" key={stock.code}>
+                      <div
+                        className="limitup-row limitup-row-clickable"
+                        key={stock.code}
+                        onClick={() =>
+                          navigateStockDetail(stock.code, selectedLimitUpBoardData.name)
+                        }
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            navigateStockDetail(stock.code, selectedLimitUpBoardData.name);
+                          }
+                        }}
+                      >
                         <FieldValue
                           label="股票"
                           value={
@@ -1306,6 +1577,258 @@ export default function App() {
                       <span className="topbar-note">当前没有可展示的真实板块记录。</span>
                     </div>
                   )}
+                </div>
+              )}
+            </article>
+          </section>
+        )}
+
+        {activeNav === "home" && activeHomeSubpage === "stock" && (
+          <section className="home-top-feed">
+            <article className="card wide stock-detail-card">
+              <div className="card-head">
+                <div>
+                  <p className="section-kicker">Stock Detail</p>
+                  <h2>{stockDetail?.name ?? selectedStockCode ?? "个股详情"}</h2>
+                </div>
+                <button
+                  type="button"
+                  className="secondary action-link"
+                  onClick={() => {
+                    if (selectedLimitUpBoard) {
+                      navigateHomeSubpage("boards", selectedLimitUpBoard);
+                      return;
+                    }
+
+                    navigateHomeSubpage("overview");
+                  }}
+                >
+                  返回上一页
+                </button>
+              </div>
+
+              <p className="market-strip-meta">
+                {stockDetailError
+                  ? `数据源异常：${stockDetailError}`
+                  : stockDetailLoading
+                    ? "正在获取个股实时详情..."
+                    : `数据来源：东方财富实时个股行情 · ${stockDetailUpdatedAt} 更新`}
+              </p>
+
+              {stockDetail ? (
+                <div className="stock-detail-layout">
+                  <div className="stock-detail-main">
+                    <div className="stock-hero">
+                      <div className="stock-hero-title">
+                        <div className="stock-name-row">
+                          <strong>{stockDetail.name}</strong>
+                          <span className="stock-market-tag">
+                            {stockDetail.market}
+                            {stockDetail.code}
+                          </span>
+                          <span className="stock-market-tag muted">{stockDetail.industry}</span>
+                        </div>
+                        <div className="stock-price-row">
+                          <strong className={stockDetail.changePercent >= 0 ? "up" : "down"}>
+                            {stockDetail.price.toFixed(2)}
+                          </strong>
+                          <span className={stockDetail.changePercent >= 0 ? "up" : "down"}>
+                            {`${stockDetail.changeAmount >= 0 ? "+" : ""}${stockDetail.changeAmount.toFixed(2)} (${percent(stockDetail.changePercent)})`}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="stock-quote-grid">
+                      <div className="stock-quote-item">
+                        <span>今开</span>
+                        <strong>{stockDetail.open.toFixed(2)}</strong>
+                      </div>
+                      <div className="stock-quote-item">
+                        <span>最高</span>
+                        <strong>{stockDetail.high.toFixed(2)}</strong>
+                      </div>
+                      <div className="stock-quote-item">
+                        <span>最低</span>
+                        <strong>{stockDetail.low.toFixed(2)}</strong>
+                      </div>
+                      <div className="stock-quote-item">
+                        <span>昨收</span>
+                        <strong>{stockDetail.prevClose.toFixed(2)}</strong>
+                      </div>
+                      <div className="stock-quote-item">
+                        <span>均价</span>
+                        <strong>{stockDetail.averagePrice.toFixed(2)}</strong>
+                      </div>
+                      <div className="stock-quote-item">
+                        <span>涨停价</span>
+                        <strong className="up">{stockDetail.upLimit.toFixed(2)}</strong>
+                      </div>
+                      <div className="stock-quote-item">
+                        <span>跌停价</span>
+                        <strong className="down">{stockDetail.downLimit.toFixed(2)}</strong>
+                      </div>
+                      <div className="stock-quote-item">
+                        <span>量比</span>
+                        <strong>{formatPlainNumber(stockDetail.volumeRatio)}</strong>
+                      </div>
+                      <div className="stock-quote-item">
+                        <span>换手率</span>
+                        <strong>{formatPlainNumber(stockDetail.turnoverRate)}%</strong>
+                      </div>
+                      <div className="stock-quote-item">
+                        <span>振幅</span>
+                        <strong>{formatPlainNumber(stockDetail.amplitude)}%</strong>
+                      </div>
+                      <div className="stock-quote-item">
+                        <span>成交量</span>
+                        <strong>{formatVolumeInWanHands(stockDetail.volume)}</strong>
+                      </div>
+                      <div className="stock-quote-item">
+                        <span>成交额</span>
+                        <strong>{formatLargeYi(stockDetail.amount)}</strong>
+                      </div>
+                      <div className="stock-quote-item">
+                        <span>总股本</span>
+                        <strong>{formatShareCount(stockDetail.totalShares)}</strong>
+                      </div>
+                      <div className="stock-quote-item">
+                        <span>流通股</span>
+                        <strong>{formatShareCount(stockDetail.floatShares)}</strong>
+                      </div>
+                      <div className="stock-quote-item">
+                        <span>总市值</span>
+                        <strong>{formatLargeYi(stockDetail.totalMarketCap)}</strong>
+                      </div>
+                      <div className="stock-quote-item">
+                        <span>流通市值</span>
+                        <strong>{formatLargeYi(stockDetail.floatMarketCap)}</strong>
+                      </div>
+                      <div className="stock-quote-item">
+                        <span>市盈率 TTM</span>
+                        <strong>{formatPlainNumber(stockDetail.peTtm)}</strong>
+                      </div>
+                      <div className="stock-quote-item">
+                        <span>市净率</span>
+                        <strong>{formatPlainNumber(stockDetail.pb)}</strong>
+                      </div>
+                    </div>
+
+                    <div className="stock-trend-card">
+                      <div className="stock-trend-toolbar">
+                        <div className="stock-trend-tabs">
+                          {[1, 5].map((range) => (
+                            <button
+                              key={range}
+                              type="button"
+                              className={`stock-trend-tab ${stockTrendRange === range ? "active" : ""}`}
+                              onClick={() => setStockTrendRange(range as StockTrendRange)}
+                            >
+                              {range === 1 ? "分时" : "五日"}
+                            </button>
+                          ))}
+                        </div>
+                        <span className="topbar-note">
+                          {stockTrendError
+                            ? `走势异常：${stockTrendError}`
+                            : stockTrendLoading
+                              ? "正在获取真实走势..."
+                              : `${stockTrendRange === 1 ? "分时" : "五日"} 走势`}
+                        </span>
+                      </div>
+
+                      {stockTrendStats ? (
+                        <div className="stock-trend-visual">
+                          <div className="stock-trend-scale">
+                            <span>{stockTrendStats.top.toFixed(2)}</span>
+                            <span>{stockTrendStats.basePrice.toFixed(2)}</span>
+                            <span>{stockTrendStats.bottom.toFixed(2)}</span>
+                          </div>
+                          <div className="stock-trend-canvas">
+                            <svg
+                              viewBox={`0 0 ${stockTrendStats.width} ${stockTrendStats.height}`}
+                              className="stock-trend-svg"
+                              preserveAspectRatio="none"
+                            >
+                              <line
+                                x1="0"
+                                y1={stockTrendStats.height / 2}
+                                x2={stockTrendStats.width}
+                                y2={stockTrendStats.height / 2}
+                                className="stock-trend-baseline"
+                              />
+                              <path d={stockTrendStats.avgPath} className="stock-trend-average" />
+                              <path d={stockTrendStats.path} className="stock-trend-line" />
+                            </svg>
+                            <div className="stock-trend-axis">
+                              {stockTrendStats.ticks.map((tick) => (
+                                <span key={`${tick.index}-${tick.label}`}>{tick.label}</span>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="limitup-empty-state">
+                          <strong>暂无走势数据</strong>
+                          <span className="topbar-note">当前没有可展示的实时走势图。</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <aside className="stock-detail-side">
+                    <div className="stock-side-card">
+                      <span className="section-kicker">Related Board</span>
+                      <h3>{effectiveStockBoardName ?? "相关板块"}</h3>
+                      {relatedBoardData ? (
+                        <>
+                          <div className="stock-side-board-metrics">
+                            <span>{relatedBoardData.stocks.length} 家涨停</span>
+                            <span>高度 {relatedBoardData.maxBoardHeight} 板</span>
+                          </div>
+                          <div className="stock-side-list">
+                            {relatedBoardData.stocks
+                              .filter((stock) => stock.code !== selectedStockCode)
+                              .slice(0, 6)
+                              .map((stock) => (
+                                <button
+                                  key={stock.code}
+                                  type="button"
+                                  className="stock-side-item"
+                                  onClick={() => navigateStockDetail(stock.code, relatedBoardData.name)}
+                                >
+                                  <strong>{stock.name}</strong>
+                                  <span>
+                                    {stock.code} · {stock.price.toFixed(2)}
+                                  </span>
+                                </button>
+                              ))}
+                          </div>
+                        </>
+                      ) : (
+                        <div className="limitup-empty-state">
+                          <strong>暂无相关板块数据</strong>
+                          <span className="topbar-note">当前板块联动数据暂不可用。</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="stock-side-card">
+                      <span className="section-kicker">Limit Up Context</span>
+                      <h3>涨停背景</h3>
+                      <p className="stock-side-reason">
+                        {limitUpStocks.find((stock) => stock.code === selectedStockCode)?.reason ??
+                          "当前未命中涨停池原因描述。"}
+                      </p>
+                    </div>
+                  </aside>
+                </div>
+              ) : (
+                <div className="limitup-empty-state">
+                  <strong>{stockDetailLoading ? "正在加载个股详情" : "暂无个股详情"}</strong>
+                  <span className="topbar-note">
+                    {stockDetailLoading ? "请稍候，正在获取真实行情与走势。" : "当前没有可展示的个股详情数据。"}
+                  </span>
                 </div>
               )}
             </article>

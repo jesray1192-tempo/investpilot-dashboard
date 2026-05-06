@@ -91,6 +91,42 @@ export interface LimitUpStock {
   industry: string;
 }
 
+export interface StockTrendPoint {
+  timestamp: string;
+  price: number;
+  averagePrice: number;
+  volume: number;
+  amount: number;
+}
+
+export interface StockDetail {
+  code: string;
+  name: string;
+  market: "SH" | "SZ";
+  industry: string;
+  price: number;
+  changeAmount: number;
+  changePercent: number;
+  open: number;
+  high: number;
+  low: number;
+  prevClose: number;
+  averagePrice: number;
+  volume: number;
+  amount: number;
+  volumeRatio: number;
+  turnoverRate: number;
+  amplitude: number;
+  upLimit: number;
+  downLimit: number;
+  totalShares: number;
+  floatShares: number;
+  totalMarketCap: number;
+  floatMarketCap: number;
+  peTtm: number | null;
+  pb: number | null;
+}
+
 export interface TradeRecord {
   id: string;
   date: string;
