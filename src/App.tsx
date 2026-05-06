@@ -1,11 +1,10 @@
-import { ChangeEvent, DragEvent, ReactNode, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, DragEvent, FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
 import {
   dataSources,
   holdings,
   marketBreadth,
   marketEvents,
   riskSignals,
-  thesisRecords,
   tradeRecords
 } from "./data/mock";
 import { fetchLiveLimitUpPool } from "./services/limitUpPool";
@@ -42,6 +41,17 @@ type PolicyMaterial = {
   kind: string;
 };
 
+type HoldingFormState = {
+  code: string;
+  name: string;
+  shares: string;
+  cost: string;
+  price: string;
+  targetPrice: string;
+  stopLoss: string;
+  thesis: string;
+};
+
 type UploadAsset = {
   name: string;
   kind: string;
@@ -51,15 +61,17 @@ type UploadAsset = {
 function FieldValue({
   label,
   value,
-  className = ""
+  className = "",
+  hideLabel = false
 }: {
   label: string;
   value: ReactNode;
   className?: string;
+  hideLabel?: boolean;
 }) {
   return (
     <span className={`field-pair ${className}`.trim()}>
-      <small className="field-label">{label}</small>
+      {!hideLabel && <small className="field-label">{label}</small>}
       <span className="field-value">{value}</span>
     </span>
   );
@@ -335,6 +347,30 @@ function formatCompactDate(value: number) {
   return `${text.slice(0, 4)}-${text.slice(4, 6)}-${text.slice(6, 8)}`;
 }
 
+const emptyHoldingForm: HoldingFormState = {
+  code: "",
+  name: "",
+  shares: "",
+  cost: "",
+  price: "",
+  targetPrice: "",
+  stopLoss: "",
+  thesis: ""
+};
+
+function holdingToFormState(item: Holding): HoldingFormState {
+  return {
+    code: item.code,
+    name: item.name,
+    shares: `${item.shares}`,
+    cost: `${item.cost}`,
+    price: `${item.price}`,
+    targetPrice: typeof item.targetPrice === "number" ? `${item.targetPrice}` : "",
+    stopLoss: typeof item.stopLoss === "number" ? `${item.stopLoss}` : "",
+    thesis: item.thesis
+  };
+}
+
 function totalMarketValue(items: Holding[]) {
   return items.reduce((sum, item) => sum + item.shares * item.price, 0);
 }
@@ -461,7 +497,12 @@ export default function App() {
   const [stockTrendPoints, setStockTrendPoints] = useState<StockTrendPoint[]>([]);
   const [stockTrendLoading, setStockTrendLoading] = useState(false);
   const [stockTrendError, setStockTrendError] = useState("");
-  const [portfolio] = useState(holdings);
+  const [portfolio, setPortfolio] = useState<Holding[]>(holdings);
+  const [isHoldingEditorOpen, setIsHoldingEditorOpen] = useState(false);
+  const [holdingEditorMode, setHoldingEditorMode] = useState<"create" | "edit">("create");
+  const [editingHoldingCode, setEditingHoldingCode] = useState<string | null>(null);
+  const [holdingForm, setHoldingForm] = useState<HoldingFormState>(emptyHoldingForm);
+  const [holdingFormError, setHoldingFormError] = useState("");
   const marketValue = useMemo(() => totalMarketValue(portfolio), [portfolio]);
   const costValue = useMemo(() => totalCostValue(portfolio), [portfolio]);
   const pnl = marketValue - costValue;
@@ -731,6 +772,111 @@ export default function App() {
     () => buildMultimodalOutput(uploadAssets, aiLinkInput, aiNoteInput, analysisRuns),
     [uploadAssets, aiLinkInput, aiNoteInput, analysisRuns]
   );
+
+  function openCreateHoldingEditor() {
+    setHoldingEditorMode("create");
+    setEditingHoldingCode(null);
+    setHoldingForm(emptyHoldingForm);
+    setHoldingFormError("");
+    setIsHoldingEditorOpen(true);
+  }
+
+  function openEditHoldingEditor(item: Holding) {
+    setHoldingEditorMode("edit");
+    setEditingHoldingCode(item.code);
+    setHoldingForm(holdingToFormState(item));
+    setHoldingFormError("");
+    setIsHoldingEditorOpen(true);
+  }
+
+  function closeHoldingEditor() {
+    setIsHoldingEditorOpen(false);
+    setHoldingFormError("");
+    setEditingHoldingCode(null);
+    setHoldingForm(emptyHoldingForm);
+  }
+
+  function handleHoldingFormChange(event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
+    const { name, value } = event.target;
+    setHoldingForm((current) => ({ ...current, [name]: value }));
+  }
+
+  function handleHoldingSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const normalizedCode = holdingForm.code.trim();
+    const normalizedName = holdingForm.name.trim();
+    const normalizedThesis = holdingForm.thesis.trim();
+    const shares = Number(holdingForm.shares);
+    const cost = Number(holdingForm.cost);
+    const price = Number(holdingForm.price);
+    const targetPrice = holdingForm.targetPrice.trim() ? Number(holdingForm.targetPrice) : undefined;
+    const stopLoss = holdingForm.stopLoss.trim() ? Number(holdingForm.stopLoss) : undefined;
+
+    if (!normalizedCode || !normalizedName || !normalizedThesis) {
+      setHoldingFormError("请完整填写股票代码、名称和买入逻辑。");
+      return;
+    }
+
+    if ([shares, cost, price].some((value) => !Number.isFinite(value) || value <= 0)) {
+      setHoldingFormError("持仓股数、成本价和现价必须是大于 0 的数字。");
+      return;
+    }
+
+    if (
+      (typeof targetPrice === "number" && (!Number.isFinite(targetPrice) || targetPrice <= 0)) ||
+      (typeof stopLoss === "number" && (!Number.isFinite(stopLoss) || stopLoss <= 0))
+    ) {
+      setHoldingFormError("目标价和止损价如果填写，必须是大于 0 的数字。");
+      return;
+    }
+
+    const editingItem = portfolio.find((item) => item.code === editingHoldingCode);
+    const existingCodeItem = portfolio.find((item) => item.code === normalizedCode);
+    const duplicatedCode = existingCodeItem && existingCodeItem.code !== editingHoldingCode;
+
+    if (duplicatedCode) {
+      setHoldingFormError("该股票代码已经存在，请直接编辑原有持仓。");
+      return;
+    }
+
+    const nextHolding: Holding = {
+      code: normalizedCode,
+      name: normalizedName,
+      shares,
+      cost,
+      price,
+      dailyChange: editingItem?.dailyChange ?? existingCodeItem?.dailyChange ?? 0,
+      thesis: normalizedThesis,
+      tags: editingItem?.tags ?? existingCodeItem?.tags ?? [],
+      targetPrice,
+      stopLoss
+    };
+
+    setPortfolio((current) => {
+      if (holdingEditorMode === "edit" && editingHoldingCode) {
+        return current.map((item) => (item.code === editingHoldingCode ? nextHolding : item));
+      }
+
+      return [nextHolding, ...current];
+    });
+
+    closeHoldingEditor();
+  }
+
+  function handleDeleteHolding(code: string) {
+    const item = portfolio.find((entry) => entry.code === code);
+
+    if (!item) {
+      return;
+    }
+
+    if (!window.confirm(`确认删除 ${item.name}（${item.code}）这条持仓吗？`)) {
+      return;
+    }
+
+    setPortfolio((current) => current.filter((entry) => entry.code !== code));
+  }
 
   useEffect(() => {
     if (!selectedLimitUpBoard) {
@@ -1896,59 +2042,213 @@ export default function App() {
                 </div>
 
                 {activePortfolioTab === "holdings" && (
-                  <div className="table-scroll">
-                    <div className="position-table">
-                      <div className="table-head">
-                        <span>股票</span>
-                        <span>持仓股数</span>
-                        <span>成本价</span>
-                        <span>现价</span>
-                        <span>总盈亏</span>
-                        <span>收益率</span>
-                        <span>纪律</span>
-                        <span>买入逻辑</span>
+                  <div className="portfolio-manager">
+                    <div className="portfolio-toolbar">
+                      <div className="portfolio-toolbar-copy">
+                        <strong>持仓管理</strong>
+                        <span>支持新增、编辑和删除当前持仓股票。</span>
                       </div>
-                      {portfolio.map((item) => {
-                        const currentValue = item.shares * item.price;
-                        const currentCost = item.shares * item.cost;
-                        const totalPnl = currentValue - currentCost;
-                        const returnRate = (totalPnl / currentCost) * 100;
-                        const thesis = thesisRecords.find((record) => record.code === item.code);
+                      <button type="button" className="action-btn" onClick={openCreateHoldingEditor}>
+                        新增股票
+                      </button>
+                    </div>
 
-                        return (
-                          <div className="table-row wide-table-row" key={item.code}>
-                            <FieldValue
-                              label="股票"
-                              value={
-                                <>
-                              <strong>{item.name}</strong>
-                              <small>{item.code}</small>
-                                </>
-                              }
-                            />
-                            <FieldValue label="持仓股数" value={item.shares} />
-                            <FieldValue label="成本价" value={currency(item.cost)} />
-                            <FieldValue label="现价" value={currency(item.price)} />
-                            <FieldValue
-                              label="总盈亏"
-                              value={<span className={totalPnl >= 0 ? "up" : "down"}>{currency(totalPnl)}</span>}
-                            />
-                            <FieldValue
-                              label="收益率"
-                              value={<span className={returnRate >= 0 ? "up" : "down"}>{percent(returnRate)}</span>}
-                            />
-                            <FieldValue
-                              label="纪律"
-                              value={`目标 ${item.targetPrice} / 止损 ${item.stopLoss}`}
-                            />
-                            <FieldValue
-                              label="买入逻辑"
-                              className="inline-thesis-cell"
-                              value={thesis?.reason ?? item.thesis}
-                            />
+                    {isHoldingEditorOpen && (
+                      <form className="holding-editor" onSubmit={handleHoldingSubmit}>
+                        <div className="holding-editor-head">
+                          <div>
+                            <strong>{holdingEditorMode === "create" ? "新增持仓" : "编辑持仓"}</strong>
+                            <span>保存后会立即更新当前持仓列表。</span>
                           </div>
-                        );
-                      })}
+                          <button type="button" className="ghost-btn" onClick={closeHoldingEditor}>
+                            取消
+                          </button>
+                        </div>
+
+                        <div className="holding-form-grid">
+                          <label className="holding-form-field">
+                            <span>股票代码</span>
+                            <input
+                              className="real-input"
+                              name="code"
+                              value={holdingForm.code}
+                              onChange={handleHoldingFormChange}
+                              placeholder="如 600519"
+                            />
+                          </label>
+                          <label className="holding-form-field">
+                            <span>股票名称</span>
+                            <input
+                              className="real-input"
+                              name="name"
+                              value={holdingForm.name}
+                              onChange={handleHoldingFormChange}
+                              placeholder="如 贵州茅台"
+                            />
+                          </label>
+                          <label className="holding-form-field">
+                            <span>持仓股数</span>
+                            <input
+                              className="real-input"
+                              name="shares"
+                              type="number"
+                              min="1"
+                              step="1"
+                              value={holdingForm.shares}
+                              onChange={handleHoldingFormChange}
+                              placeholder="如 100"
+                            />
+                          </label>
+                          <label className="holding-form-field">
+                            <span>成本价</span>
+                            <input
+                              className="real-input"
+                              name="cost"
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={holdingForm.cost}
+                              onChange={handleHoldingFormChange}
+                              placeholder="如 23.56"
+                            />
+                          </label>
+                          <label className="holding-form-field">
+                            <span>现价</span>
+                            <input
+                              className="real-input"
+                              name="price"
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={holdingForm.price}
+                              onChange={handleHoldingFormChange}
+                              placeholder="如 24.12"
+                            />
+                          </label>
+                          <label className="holding-form-field">
+                            <span>目标价</span>
+                            <input
+                              className="real-input"
+                              name="targetPrice"
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={holdingForm.targetPrice}
+                              onChange={handleHoldingFormChange}
+                              placeholder="如 28.00"
+                            />
+                          </label>
+                          <label className="holding-form-field">
+                            <span>止损价</span>
+                            <input
+                              className="real-input"
+                              name="stopLoss"
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={holdingForm.stopLoss}
+                              onChange={handleHoldingFormChange}
+                              placeholder="如 21.50"
+                            />
+                          </label>
+                          <label className="holding-form-field holding-form-field-wide">
+                            <span>买入逻辑</span>
+                            <textarea
+                              className="real-textarea compact-textarea"
+                              name="thesis"
+                              value={holdingForm.thesis}
+                              onChange={handleHoldingFormChange}
+                              placeholder="补充这只股票的买入逻辑、仓位用途和观察点。"
+                            />
+                          </label>
+                        </div>
+
+                        <div className="holding-editor-actions">
+                          {holdingFormError && <p className="form-error">{holdingFormError}</p>}
+                          <button type="submit" className="action-btn">
+                            {holdingEditorMode === "create" ? "确认新增" : "保存修改"}
+                          </button>
+                        </div>
+                      </form>
+                    )}
+
+                    <div className="table-scroll">
+                      <div className="position-table position-table-managed">
+                        <div className="table-head">
+                          <span>股票</span>
+                          <span>持仓股数</span>
+                          <span>成本价</span>
+                          <span>现价</span>
+                          <span>总盈亏</span>
+                          <span>收益率</span>
+                          <span>纪律</span>
+                          <span>买入逻辑</span>
+                          <span>操作</span>
+                        </div>
+                        {portfolio.map((item) => {
+                          const currentValue = item.shares * item.price;
+                          const currentCost = item.shares * item.cost;
+                          const totalPnl = currentValue - currentCost;
+                          const returnRate = (totalPnl / currentCost) * 100;
+
+                          return (
+                            <div className="table-row wide-table-row holding-table-row" key={item.code}>
+                              <FieldValue
+                                label="股票"
+                                hideLabel
+                                value={
+                                  <>
+                                    <strong>{item.name}</strong>
+                                    <small>{item.code}</small>
+                                  </>
+                                }
+                              />
+                              <FieldValue label="持仓股数" value={item.shares} />
+                              <FieldValue label="成本价" value={currency(item.cost)} />
+                              <FieldValue label="现价" value={currency(item.price)} />
+                              <FieldValue
+                                label="总盈亏"
+                                value={<span className={totalPnl >= 0 ? "up" : "down"}>{currency(totalPnl)}</span>}
+                              />
+                              <FieldValue
+                                label="收益率"
+                                value={<span className={returnRate >= 0 ? "up" : "down"}>{percent(returnRate)}</span>}
+                              />
+                              <FieldValue
+                                label="纪律"
+                                value={`目标 ${item.targetPrice} / 止损 ${item.stopLoss}`}
+                              />
+                              <FieldValue
+                                label="买入逻辑"
+                                className="inline-thesis-cell"
+                                value={item.thesis}
+                              />
+                              <FieldValue
+                                label="操作"
+                                className="row-action-cell"
+                                value={
+                                  <div className="row-actions">
+                                    <button
+                                      type="button"
+                                      className="inline-action-btn"
+                                      onClick={() => openEditHoldingEditor(item)}
+                                    >
+                                      编辑
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="inline-action-btn danger"
+                                      onClick={() => handleDeleteHolding(item.code)}
+                                    >
+                                      删除
+                                    </button>
+                                  </div>
+                                }
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
                 )}

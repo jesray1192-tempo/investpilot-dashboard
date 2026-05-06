@@ -1329,6 +1329,105 @@ h2 {
   gap: 14px;
 }
 
+.portfolio-manager {
+  display: grid;
+  gap: 18px;
+}
+
+.portfolio-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.portfolio-toolbar-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.portfolio-toolbar-copy strong {
+  font-size: 1rem;
+}
+
+.portfolio-toolbar-copy span {
+  color: rgba(242, 239, 232, 0.62);
+  font-size: 0.92rem;
+}
+
+.holding-editor {
+  display: grid;
+  gap: 18px;
+  padding: 20px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.015)),
+    rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 22px;
+}
+
+.holding-editor-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.holding-editor-head strong {
+  display: block;
+  font-size: 1.08rem;
+  margin-bottom: 6px;
+}
+
+.holding-editor-head span {
+  color: rgba(242, 239, 232, 0.62);
+  font-size: 0.92rem;
+}
+
+.holding-form-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.holding-form-field {
+  display: grid;
+  gap: 8px;
+}
+
+.holding-form-field span {
+  color: rgba(242, 239, 232, 0.68);
+  font-size: 0.84rem;
+}
+
+.holding-form-field-wide {
+  grid-column: span 4;
+}
+
+.holding-editor-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.ghost-btn {
+  border-radius: 999px;
+  padding: 0.82rem 1.15rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #f2efe8;
+  cursor: pointer;
+}
+
+.form-error {
+  margin: 0;
+  color: #ff9d86;
+  font-size: 0.9rem;
+}
+
 .table-scroll {
   width: 100%;
   overflow-x: auto;
@@ -1369,6 +1468,15 @@ h2 {
   min-width: 980px;
 }
 
+.position-table-managed {
+  min-width: 1120px;
+}
+
+.position-table-managed .table-head,
+.holding-table-row {
+  grid-template-columns: 1.05fr 0.7fr 0.82fr 0.82fr 0.88fr 0.78fr 0.95fr 1.55fr 0.78fr;
+}
+
 .field-pair {
   display: grid;
   gap: 4px;
@@ -1392,6 +1500,33 @@ h2 {
   color: rgba(242, 239, 232, 0.76);
   line-height: 1.55;
   overflow-wrap: anywhere;
+}
+
+.row-action-cell {
+  align-self: stretch;
+}
+
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.inline-action-btn {
+  border: 1px solid rgba(99, 157, 255, 0.18);
+  background: rgba(63, 133, 255, 0.12);
+  color: #cfe0ff;
+  border-radius: 999px;
+  padding: 0.45rem 0.82rem;
+  cursor: pointer;
+  font: inherit;
+}
+
+.inline-action-btn.danger {
+  border-color: rgba(238, 124, 56, 0.16);
+  background: rgba(238, 124, 56, 0.1);
+  color: #ffc49f;
 }
 
 .table-row strong,
@@ -1792,7 +1927,23 @@ h2 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .portfolio-toolbar,
+  .holding-editor-head,
+  .holding-editor-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .holding-form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .holding-form-field-wide {
+    grid-column: span 2;
+  }
+
   .subnav-btn,
+  .ghost-btn,
   .upload-trigger,
   .action-btn {
     width: 100%;
@@ -1905,6 +2056,20 @@ h2 {
 
   .subnav-row {
     grid-template-columns: 1fr;
+  }
+
+  .portfolio-toolbar,
+  .holding-editor-head,
+  .holding-editor-actions {
+    display: grid;
+  }
+
+  .holding-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .holding-form-field-wide {
+    grid-column: span 1;
   }
 
   .limitup-summary-grid {
