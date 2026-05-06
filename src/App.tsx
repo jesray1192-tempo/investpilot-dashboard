@@ -131,30 +131,6 @@ function formatCompactDate(value: number) {
   return `${text.slice(0, 4)}-${text.slice(4, 6)}-${text.slice(6, 8)}`;
 }
 
-function parseBoardTimeToMinutes(value: string) {
-  const match = value.match(/^(\d{2}):(\d{2})$/);
-  if (!match) {
-    return null;
-  }
-
-  const hour = Number.parseInt(match[1], 10);
-  const minute = Number.parseInt(match[2], 10);
-  return hour * 60 + minute;
-}
-
-function boardTimeProgress(value: string) {
-  const minutes = parseBoardTimeToMinutes(value);
-  const marketOpen = 9 * 60 + 25;
-  const marketClose = 15 * 60;
-
-  if (minutes === null) {
-    return 50;
-  }
-
-  const clamped = Math.min(Math.max(minutes, marketOpen), marketClose);
-  return ((clamped - marketOpen) / (marketClose - marketOpen)) * 100;
-}
-
 function totalMarketValue(items: Holding[]) {
   return items.reduce((sum, item) => sum + item.shares * item.price, 0);
 }
@@ -260,6 +236,7 @@ export default function App() {
   const [limitUpError, setLimitUpError] = useState("");
   const [limitUpUpdatedAt, setLimitUpUpdatedAt] = useState("");
   const [selectedLimitUpBoard, setSelectedLimitUpBoard] = useState<string | null>(null);
+  const [showAllLimitUpBoards, setShowAllLimitUpBoards] = useState(false);
   const [portfolio] = useState(holdings);
   const marketValue = useMemo(() => totalMarketValue(portfolio), [portfolio]);
   const costValue = useMemo(() => totalCostValue(portfolio), [portfolio]);
@@ -377,7 +354,6 @@ export default function App() {
           consecutiveBoardCount: number;
           maxBoardHeight: number;
           totalSealAmount: number;
-          firstLimitUpTime: string;
         }
       >
     >((acc, stock) => {
@@ -391,8 +367,7 @@ export default function App() {
           firstBoardCount: 0,
           consecutiveBoardCount: 0,
           maxBoardHeight: 0,
-          totalSealAmount: 0,
-          firstLimitUpTime: stock.firstLimitUpTime
+          totalSealAmount: 0
         };
       }
 
@@ -407,15 +382,6 @@ export default function App() {
         acc[boardName].firstBoardCount += 1;
       } else {
         acc[boardName].consecutiveBoardCount += 1;
-      }
-
-      const currentFirstTime = parseBoardTimeToMinutes(acc[boardName].firstLimitUpTime);
-      const nextFirstTime = parseBoardTimeToMinutes(stock.firstLimitUpTime);
-      if (
-        nextFirstTime !== null &&
-        (currentFirstTime === null || nextFirstTime < currentFirstTime)
-      ) {
-        acc[boardName].firstLimitUpTime = stock.firstLimitUpTime;
       }
 
       return acc;
@@ -434,25 +400,14 @@ export default function App() {
     });
   }, [limitUpStocks]);
 
-  const limitUpBoardTimeline = useMemo(() => {
-    const laneCount = 4;
-
-    return limitUpBoards.slice(0, 12).map((board, index) => ({
-      ...board,
-      progress: boardTimeProgress(board.firstLimitUpTime),
-      lane: index % laneCount,
-      sealStrength:
-        board.totalSealAmount >= 10
-          ? "high"
-          : board.totalSealAmount >= 4
-            ? "medium"
-            : "low"
-    }));
-  }, [limitUpBoards]);
-
   const selectedLimitUpBoardData = useMemo(
     () => limitUpBoards.find((board) => board.name === selectedLimitUpBoard) ?? null,
     [limitUpBoards, selectedLimitUpBoard]
+  );
+
+  const visibleLimitUpBoards = useMemo(
+    () => (showAllLimitUpBoards ? limitUpBoards : limitUpBoards.slice(0, 4)),
+    [limitUpBoards, showAllLimitUpBoards]
   );
 
   const currentNav = navItems.find((item) => item.key === activeNav) ?? navItems[0];
@@ -489,6 +444,12 @@ export default function App() {
       setSelectedLimitUpBoard(null);
     }
   }, [limitUpBoards, selectedLimitUpBoard]);
+
+  useEffect(() => {
+    if (selectedLimitUpBoardData) {
+      setShowAllLimitUpBoards(false);
+    }
+  }, [selectedLimitUpBoardData]);
 
   function mergeAssets(nextAssets: UploadAsset[]) {
     setUploadAssets((current) => [...current, ...nextAssets]);
@@ -801,7 +762,13 @@ export default function App() {
                 <div className="card-head">
                   <div>
                     <p className="section-kicker">Board View</p>
-                    <h2>{selectedLimitUpBoardData ? selectedLimitUpBoardData.name : "当日板块"}</h2>
+                    <h2>
+                      {selectedLimitUpBoardData
+                        ? selectedLimitUpBoardData.name
+                        : showAllLimitUpBoards
+                          ? "全部板块"
+                          : "当日板块"}
+                    </h2>
                   </div>
                   {selectedLimitUpBoardData ? (
                     <button
@@ -809,10 +776,16 @@ export default function App() {
                       className="secondary limitup-back-btn"
                       onClick={() => setSelectedLimitUpBoard(null)}
                     >
-                      返回板块趋势图
+                      返回板块列表
                     </button>
                   ) : (
-                    <div className="topbar-note">点击趋势图中的板块，进入该方向的二级股票列表页</div>
+                    <button
+                      type="button"
+                      className="secondary action-link"
+                      onClick={() => setShowAllLimitUpBoards((value) => !value)}
+                    >
+                      {showAllLimitUpBoards ? "收起" : "查看更多"}
+                    </button>
                   )}
                 </div>
 
@@ -884,36 +857,38 @@ export default function App() {
                       {limitUpError
                         ? `数据源异常：${limitUpError}`
                         : limitUpLoading
-                          ? "正在获取真实板块趋势数据..."
+                          ? "正在获取真实板块数据..."
                           : `数据来源：东方财富涨停池 · ${limitUpUpdatedAt} 更新`}
                     </p>
-                    <div className="limitup-board-timeline">
-                      <div className="limitup-board-track">
-                        <div className="limitup-board-track-line" />
-                        {limitUpBoardTimeline.map((board) => (
-                          <button
-                            key={board.name}
-                            type="button"
-                            className={`limitup-board-node lane-${board.lane} ${board.sealStrength}`}
-                            style={{ left: `${board.progress}%` }}
-                            onClick={() => setSelectedLimitUpBoard(board.name)}
-                          >
-                            <span className="limitup-board-node-time">{board.firstLimitUpTime}</span>
-                            <span className="limitup-board-node-label">{board.name}</span>
-                            <span className="limitup-board-node-meta">
-                              {board.stocks.length} 家 / {board.maxBoardHeight} 板
-                            </span>
-                          </button>
-                        ))}
-                        <div className="limitup-board-axis">
-                          <span>09:25</span>
-                          <span>10:30</span>
-                          <span>11:30 / 13:00</span>
-                          <span>14:00</span>
-                          <span>15:00</span>
-                        </div>
-                      </div>
+                    <div className="limitup-board-grid">
+                      {visibleLimitUpBoards.map((board) => (
+                        <button
+                          key={board.name}
+                          type="button"
+                          className="limitup-board-card"
+                          onClick={() => setSelectedLimitUpBoard(board.name)}
+                        >
+                          <div className="limitup-board-card-head">
+                            <strong>{board.name}</strong>
+                            <span>{board.stocks.length} 家</span>
+                          </div>
+                          <div className="limitup-board-card-metrics">
+                            <span>连板高度 {board.maxBoardHeight} 板</span>
+                            <span>连板 {board.consecutiveBoardCount} 家</span>
+                            <span>首板 {board.firstBoardCount} 家</span>
+                          </div>
+                        </button>
+                      ))}
                     </div>
+                    {!showAllLimitUpBoards && limitUpBoards.length > 4 && (
+                      <div className="topbar-note">当前展示前 4 个板块，点击“查看更多”查看完整列表。</div>
+                    )}
+                    {!limitUpLoading && limitUpBoards.length === 0 && (
+                      <div className="limitup-empty-state">
+                        <strong>暂无板块数据</strong>
+                        <span className="topbar-note">当前没有可展示的真实板块记录。</span>
+                      </div>
+                    )}
                   </div>
                 )}
               </article>
