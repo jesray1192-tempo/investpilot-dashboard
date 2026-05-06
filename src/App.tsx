@@ -921,6 +921,46 @@ export default function App() {
                           </div>
                         </div>
                       </div>
+                      <div className="table-scroll">
+                        <div className="limitup-head">
+                          <span>股票</span>
+                          <span>价格</span>
+                          <span>涨停次数</span>
+                          <span>首次涨停</span>
+                          <span>开板次数</span>
+                          <span>封单额</span>
+                          <span>封单强度</span>
+                          <span>涨停原因</span>
+                        </div>
+                        {limitUpStocks.map((stock) => (
+                          <div className="limitup-row" key={stock.code}>
+                            <FieldValue
+                              label="股票"
+                              value={
+                                <>
+                                  <strong>{stock.name}</strong>
+                                  <small>{stock.code}</small>
+                                </>
+                              }
+                            />
+                            <FieldValue label="价格" value={currency(stock.price)} />
+                            <FieldValue label="涨停次数" value={`${stock.limitUpCount} 次`} />
+                            <FieldValue label="首次涨停" value={stock.firstLimitUpTime} />
+                            <FieldValue label="开板次数" value={`${stock.openBoardCount} 次`} />
+                            <FieldValue label="封单额" value={stock.sealAmount} />
+                            <FieldValue label="封单强度" value={stock.sealStrength} />
+                            <FieldValue label="涨停原因" value={stock.reason} />
+                          </div>
+                        ))}
+                        {!limitUpLoading && limitUpStocks.length === 0 && (
+                          <div className="limitup-row">
+                            <strong>暂无涨停池数据</strong>
+                            <span className="topbar-note">
+                              当前没有可展示的真实涨停池记录，可能是非交易时段或数据源暂时不可用。
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )
                 )}
