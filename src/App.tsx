@@ -258,6 +258,7 @@ export default function App() {
   const [limitUpLoading, setLimitUpLoading] = useState(true);
   const [limitUpError, setLimitUpError] = useState("");
   const [limitUpUpdatedAt, setLimitUpUpdatedAt] = useState("");
+  const [selectedLimitUpBoard, setSelectedLimitUpBoard] = useState<string | null>(null);
   const [portfolio] = useState(holdings);
   const marketValue = useMemo(() => totalMarketValue(portfolio), [portfolio]);
   const costValue = useMemo(() => totalCostValue(portfolio), [portfolio]);
@@ -368,6 +369,70 @@ export default function App() {
     };
   }, []);
 
+  const limitUpBoards = useMemo(() => {
+    const grouped = limitUpStocks.reduce<
+      Record<
+        string,
+        {
+          name: string;
+          stocks: LimitUpStock[];
+          firstBoardCount: number;
+          consecutiveBoardCount: number;
+          maxBoardHeight: number;
+          totalSealAmount: number;
+        }
+      >
+    >((acc, stock) => {
+      const boardName = stock.industry || "未知行业";
+      const numericSealAmount = Number.parseFloat(stock.sealAmount.replace("亿", "")) || 0;
+
+      if (!acc[boardName]) {
+        acc[boardName] = {
+          name: boardName,
+          stocks: [],
+          firstBoardCount: 0,
+          consecutiveBoardCount: 0,
+          maxBoardHeight: 0,
+          totalSealAmount: 0
+        };
+      }
+
+      acc[boardName].stocks.push(stock);
+      acc[boardName].totalSealAmount += numericSealAmount;
+      acc[boardName].maxBoardHeight = Math.max(
+        acc[boardName].maxBoardHeight,
+        stock.consecutiveBoardCount
+      );
+
+      if (stock.ladderType === "首板") {
+        acc[boardName].firstBoardCount += 1;
+      } else {
+        acc[boardName].consecutiveBoardCount += 1;
+      }
+
+      return acc;
+    }, {});
+
+    return Object.values(grouped).sort((a, b) => {
+      if (b.stocks.length !== a.stocks.length) {
+        return b.stocks.length - a.stocks.length;
+      }
+
+      if (b.maxBoardHeight !== a.maxBoardHeight) {
+        return b.maxBoardHeight - a.maxBoardHeight;
+      }
+
+      return b.totalSealAmount - a.totalSealAmount;
+    });
+  }, [limitUpStocks]);
+
+  const selectedLimitUpBoardData = useMemo(
+    () => limitUpBoards.find((board) => board.name === selectedLimitUpBoard) ?? null,
+    [limitUpBoards, selectedLimitUpBoard]
+  );
+
+  const visibleLimitUpStocks = selectedLimitUpBoardData?.stocks ?? limitUpStocks;
+
   const currentNav = navItems.find((item) => item.key === activeNav) ?? navItems[0];
   const homeHeadline = marketEvents[0];
   const investedRatio = Math.round((marketValue / (marketValue + 185000)) * 100);
@@ -391,6 +456,17 @@ export default function App() {
     () => buildMultimodalOutput(uploadAssets, aiLinkInput, aiNoteInput, analysisRuns),
     [uploadAssets, aiLinkInput, aiNoteInput, analysisRuns]
   );
+
+  useEffect(() => {
+    if (!selectedLimitUpBoard) {
+      return;
+    }
+
+    const boardExists = limitUpBoards.some((board) => board.name === selectedLimitUpBoard);
+    if (!boardExists) {
+      setSelectedLimitUpBoard(null);
+    }
+  }, [limitUpBoards, selectedLimitUpBoard]);
 
   function mergeAssets(nextAssets: UploadAsset[]) {
     setUploadAssets((current) => [...current, ...nextAssets]);
@@ -662,6 +738,71 @@ export default function App() {
                         <strong>{consecutiveBoardCount} 家</strong>
                       </div>
                     </div>
+                    <div className="limitup-board-panel">
+                      <div className="limitup-board-panel-head">
+                        <div>
+                          <span className="section-kicker">Board View</span>
+                          <h3>{selectedLimitUpBoardData ? selectedLimitUpBoardData.name : "当日板块"}</h3>
+                        </div>
+                        {selectedLimitUpBoardData ? (
+                          <button
+                            type="button"
+                            className="secondary limitup-back-btn"
+                            onClick={() => setSelectedLimitUpBoard(null)}
+                          >
+                            返回全部板块
+                          </button>
+                        ) : (
+                          <span className="topbar-note">
+                            点击任意板块查看该方向的涨停股票列表
+                          </span>
+                        )}
+                      </div>
+
+                      {!selectedLimitUpBoardData && (
+                        <div className="limitup-board-grid">
+                          {limitUpBoards.map((board) => (
+                            <button
+                              key={board.name}
+                              type="button"
+                              className="limitup-board-card"
+                              onClick={() => setSelectedLimitUpBoard(board.name)}
+                            >
+                              <div className="limitup-board-card-head">
+                                <strong>{board.name}</strong>
+                                <span>{board.stocks.length} 家</span>
+                              </div>
+                              <div className="limitup-board-card-metrics">
+                                <span>连板高度 {board.maxBoardHeight} 板</span>
+                                <span>连板 {board.consecutiveBoardCount} 家</span>
+                                <span>首板 {board.firstBoardCount} 家</span>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {selectedLimitUpBoardData && (
+                        <div className="limitup-board-focus">
+                          <div className="limitup-board-focus-card">
+                            <span>板块家数</span>
+                            <strong>{selectedLimitUpBoardData.stocks.length} 家</strong>
+                          </div>
+                          <div className="limitup-board-focus-card">
+                            <span>板块高度</span>
+                            <strong>{selectedLimitUpBoardData.maxBoardHeight} 板</strong>
+                          </div>
+                          <div className="limitup-board-focus-card">
+                            <span>连板家数</span>
+                            <strong>{selectedLimitUpBoardData.consecutiveBoardCount} 家</strong>
+                          </div>
+                          <div className="limitup-board-focus-card">
+                            <span>首板家数</span>
+                            <strong>{selectedLimitUpBoardData.firstBoardCount} 家</strong>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                     <div className="table-scroll">
                       <div className="limitup-head">
                         <span>股票</span>
@@ -673,9 +814,8 @@ export default function App() {
                         <span>封单强度</span>
                         <span>分类</span>
                         <span>涨停原因</span>
-                        <span>股票行业</span>
                       </div>
-                      {limitUpStocks.map((stock) => (
+                      {visibleLimitUpStocks.map((stock) => (
                         <div className="limitup-row" key={stock.code}>
                           <FieldValue
                             label="股票"
@@ -701,14 +841,15 @@ export default function App() {
                             }
                           />
                           <FieldValue label="涨停原因" value={stock.reason} />
-                          <FieldValue label="股票行业" value={stock.industry} />
                         </div>
                       ))}
-                      {!limitUpLoading && limitUpStocks.length === 0 && (
+                      {!limitUpLoading && visibleLimitUpStocks.length === 0 && (
                         <div className="limitup-row">
-                          <strong>暂无涨停池数据</strong>
+                          <strong>{selectedLimitUpBoardData ? "该板块暂无涨停股" : "暂无涨停池数据"}</strong>
                           <span className="topbar-note">
-                            当前没有可展示的真实涨停池记录，可能是非交易时段或数据源暂时不可用。
+                            {selectedLimitUpBoardData
+                              ? "当前板块筛选下没有可展示的记录。"
+                              : "当前没有可展示的真实涨停池记录，可能是非交易时段或数据源暂时不可用。"}
                           </span>
                         </div>
                       )}

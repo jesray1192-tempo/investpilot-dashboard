@@ -771,6 +771,94 @@ h2 {
   gap: 12px;
 }
 
+.limitup-board-panel {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 4px;
+}
+
+.limitup-board-panel-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.limitup-board-panel-head h3 {
+  margin: 6px 0 0;
+  font-size: 1.2rem;
+}
+
+.limitup-back-btn {
+  padding: 0.75rem 1rem;
+}
+
+.limitup-board-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.limitup-board-card {
+  border-radius: 20px;
+  padding: 18px;
+  text-align: left;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.015)),
+    rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: grid;
+  gap: 14px;
+}
+
+.limitup-board-card:hover {
+  border-color: rgba(99, 157, 255, 0.32);
+}
+
+.limitup-board-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+}
+
+.limitup-board-card-head strong {
+  font-size: 1.05rem;
+}
+
+.limitup-board-card-head span,
+.limitup-board-card-metrics span,
+.limitup-board-focus-card span {
+  color: rgba(242, 239, 232, 0.62);
+  font-size: 0.86rem;
+}
+
+.limitup-board-card-metrics {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.limitup-board-focus {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.limitup-board-focus-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 18px;
+  padding: 16px;
+  display: grid;
+  gap: 8px;
+}
+
+.limitup-board-focus-card strong {
+  font-size: 1.35rem;
+}
+
 .limitup-summary-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -799,7 +887,7 @@ h2 {
 .limitup-head,
 .limitup-row {
   display: grid;
-  grid-template-columns: 1fr 0.7fr 0.65fr 0.75fr 0.7fr 0.8fr 0.8fr 0.7fr 1.55fr 0.9fr;
+  grid-template-columns: 1fr 0.72fr 0.7fr 0.8fr 0.75fr 0.9fr 0.8fr 0.7fr 1.7fr;
   gap: 14px;
   align-items: center;
 }
@@ -832,7 +920,7 @@ h2 {
 
 .limitup-table .table-scroll > .limitup-head,
 .limitup-table .table-scroll > .limitup-row {
-  min-width: 1320px;
+  min-width: 1200px;
 }
 
 .policy-link-grid {
@@ -1242,6 +1330,10 @@ h2 {
   .limitup-table .table-scroll > .limitup-row {
     min-width: 1240px;
   }
+
+  .limitup-board-focus {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 1280px) {
@@ -1352,6 +1444,10 @@ h2 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .limitup-board-focus {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .subnav-row {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1457,6 +1553,11 @@ h2 {
 
   .limitup-summary-grid {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .limitup-board-grid,
+  .limitup-board-focus {
+    grid-template-columns: 1fr;
   }
 
   .nav-item {
