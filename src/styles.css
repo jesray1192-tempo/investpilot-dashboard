@@ -1473,6 +1473,28 @@ h2 {
   overflow-x: auto;
   overflow-y: hidden;
   padding-bottom: 4px;
+  scrollbar-color: rgba(242, 239, 232, 0.28) transparent;
+  scrollbar-width: thin;
+}
+
+.table-scroll::-webkit-scrollbar {
+  height: 10px;
+}
+
+.table-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.table-scroll::-webkit-scrollbar-thumb {
+  background: rgba(242, 239, 232, 0.24);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.table-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(242, 239, 232, 0.34);
+  background-clip: padding-box;
 }
 
 .table-head,
@@ -1549,24 +1571,24 @@ h2 {
 .row-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+  gap: 14px;
+  flex-wrap: nowrap;
 }
 
 .inline-action-btn {
-  border: 1px solid rgba(99, 157, 255, 0.18);
-  background: rgba(63, 133, 255, 0.12);
-  color: #cfe0ff;
-  border-radius: 999px;
-  padding: 0.45rem 0.82rem;
+  border: 0;
+  background: transparent;
+  color: #8db7ff;
+  border-radius: 0;
+  padding: 0;
   cursor: pointer;
   font: inherit;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .inline-action-btn.danger {
-  border-color: rgba(238, 124, 56, 0.16);
-  background: rgba(238, 124, 56, 0.1);
-  color: #ffc49f;
+  color: #ffb087;
 }
 
 .table-row strong,
