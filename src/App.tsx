@@ -369,6 +369,62 @@ const emptyHoldingForm: HoldingFormState = {
   thesis: ""
 };
 
+const portfolioProfilesStorageKey = "investpilot-portfolio-profiles";
+const activePortfolioProfileStorageKey = "investpilot-active-portfolio-profile";
+
+function clonePortfolioProfiles(profiles: PortfolioProfile[]) {
+  return profiles.map((profile) => ({
+    ...profile,
+    holdings: profile.holdings.map((holding) => ({
+      ...holding,
+      tags: [...holding.tags]
+    })),
+    trades: profile.trades.map((trade) => ({ ...trade }))
+  }));
+}
+
+function loadPortfolioProfilesFromStorage() {
+  if (typeof window === "undefined") {
+    return clonePortfolioProfiles(portfolioProfiles);
+  }
+
+  try {
+    const raw = window.localStorage.getItem(portfolioProfilesStorageKey);
+
+    if (!raw) {
+      return clonePortfolioProfiles(portfolioProfiles);
+    }
+
+    const parsed = JSON.parse(raw) as PortfolioProfile[];
+
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      return clonePortfolioProfiles(portfolioProfiles);
+    }
+
+    return parsed.map((profile) => ({
+      ...profile,
+      holdings: Array.isArray(profile.holdings)
+        ? profile.holdings.map((holding) => ({
+            ...holding,
+            tags: Array.isArray(holding.tags) ? holding.tags : []
+          }))
+        : [],
+      trades: Array.isArray(profile.trades) ? profile.trades.map((trade) => ({ ...trade })) : []
+    }));
+  } catch {
+    return clonePortfolioProfiles(portfolioProfiles);
+  }
+}
+
+function loadActivePortfolioProfileIdFromStorage() {
+  if (typeof window === "undefined") {
+    return portfolioProfiles[0]?.id ?? "mine";
+  }
+
+  const stored = window.localStorage.getItem(activePortfolioProfileStorageKey);
+  return stored || portfolioProfiles[0]?.id || "mine";
+}
+
 function holdingToFormState(item: Holding): HoldingFormState {
   return {
     code: item.code,
@@ -507,8 +563,12 @@ export default function App() {
   const [stockTrendPoints, setStockTrendPoints] = useState<StockTrendPoint[]>([]);
   const [stockTrendLoading, setStockTrendLoading] = useState(false);
   const [stockTrendError, setStockTrendError] = useState("");
-  const [portfolioProfilesState, setPortfolioProfilesState] = useState<PortfolioProfile[]>(portfolioProfiles);
-  const [activePortfolioProfileId, setActivePortfolioProfileId] = useState<string>(portfolioProfiles[0]?.id ?? "mine");
+  const [portfolioProfilesState, setPortfolioProfilesState] = useState<PortfolioProfile[]>(() =>
+    loadPortfolioProfilesFromStorage()
+  );
+  const [activePortfolioProfileId, setActivePortfolioProfileId] = useState<string>(() =>
+    loadActivePortfolioProfileIdFromStorage()
+  );
   const [isHoldingEditorOpen, setIsHoldingEditorOpen] = useState(false);
   const [holdingEditorMode, setHoldingEditorMode] = useState<"create" | "edit">("create");
   const [editingHoldingCode, setEditingHoldingCode] = useState<string | null>(null);
@@ -530,6 +590,14 @@ export default function App() {
   const pnl = marketValue - costValue;
   const pnlPercent = (pnl / costValue) * 100;
   const isEditablePortfolio = activePortfolioProfile?.id === "mine";
+
+  useEffect(() => {
+    if (portfolioProfilesState.some((profile) => profile.id === activePortfolioProfileId)) {
+      return;
+    }
+
+    setActivePortfolioProfileId(portfolioProfilesState[0]?.id ?? "mine");
+  }, [activePortfolioProfileId, portfolioProfilesState]);
 
   const riskScore = useMemo(() => {
     return Math.round(
@@ -927,6 +995,20 @@ export default function App() {
   useEffect(() => {
     closeHoldingEditor();
     setActivePortfolioTab("holdings");
+  }, [activePortfolioProfileId]);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      portfolioProfilesStorageKey,
+      JSON.stringify(portfolioProfilesState)
+    );
+  }, [portfolioProfilesState]);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      activePortfolioProfileStorageKey,
+      activePortfolioProfileId
+    );
   }, [activePortfolioProfileId]);
 
   useEffect(() => {
