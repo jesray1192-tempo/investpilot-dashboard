@@ -138,6 +138,15 @@ export interface TradeRecord {
   note: string;
 }
 
+export interface PortfolioProfile {
+  id: string;
+  label: string;
+  description: string;
+  cashEstimate: number;
+  holdings: Holding[];
+  trades: TradeRecord[];
+}
+
 export interface ThesisRecord {
   code: string;
   title: string;

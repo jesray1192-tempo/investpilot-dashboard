@@ -575,6 +575,46 @@ h2 {
   gap: 24px;
 }
 
+.portfolio-profile-tabs {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+
+.portfolio-profile-tab {
+  min-width: 220px;
+  border-radius: 22px;
+  padding: 18px 20px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #f2efe8;
+  text-align: left;
+  cursor: pointer;
+  display: grid;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.portfolio-profile-tab strong {
+  font-size: 1.32rem;
+  line-height: 1.1;
+}
+
+.portfolio-profile-tab span {
+  color: rgba(242, 239, 232, 0.62);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.portfolio-profile-tab.active {
+  background:
+    linear-gradient(135deg, rgba(63, 133, 255, 0.18), rgba(13, 28, 57, 0.16)),
+    rgba(255, 255, 255, 0.04);
+  border-color: rgba(99, 157, 255, 0.36);
+  box-shadow: 0 18px 40px rgba(9, 18, 36, 0.22);
+}
+
 .placeholder-summary {
   color: rgba(242, 239, 232, 0.78);
   line-height: 1.7;
@@ -2048,6 +2088,10 @@ h2 {
     grid-template-columns: 1fr;
   }
 
+  .portfolio-profile-tab {
+    min-width: 200px;
+  }
+
   .upload-inline-grid,
   .generated-grid,
   .policy-link-grid {
@@ -2056,6 +2100,16 @@ h2 {
 
   .subnav-row {
     grid-template-columns: 1fr;
+  }
+
+  .portfolio-profile-tabs {
+    grid-template-columns: 1fr;
+    display: grid;
+    overflow: visible;
+  }
+
+  .portfolio-profile-tab {
+    min-width: 0;
   }
 
   .portfolio-toolbar,

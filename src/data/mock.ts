@@ -6,8 +6,10 @@ import {
   MarketBreadth,
   MarketEvent,
   MarketIndex,
+  PortfolioProfile,
   SectorBoard,
-  Signal
+  Signal,
+  TradeRecord
 } from "../types";
 
 export const marketIndices: MarketIndex[] = [
@@ -320,7 +322,7 @@ export const holdings: Holding[] = [
   }
 ];
 
-export const tradeRecords = [
+export const tradeRecords: TradeRecord[] = [
   {
     id: "tr-001",
     date: "2026-04-28",
@@ -350,6 +352,224 @@ export const tradeRecords = [
     price: 201.5,
     shares: 100,
     note: "减仓控制波动敞口。"
+  }
+];
+
+export const portfolioProfiles: PortfolioProfile[] = [
+  {
+    id: "mine",
+    label: "我的持仓",
+    description: "股票仓位与盈亏跟踪",
+    cashEstimate: 185000,
+    holdings,
+    trades: tradeRecords
+  },
+  {
+    id: "caicai",
+    label: "笨笨的韭菜持仓",
+    description: "偏趋势成长，强调题材切换与主动调仓。",
+    cashEstimate: 92000,
+    holdings: [
+      {
+        code: "002491",
+        name: "通鼎互联",
+        shares: 1300,
+        cost: 16.3,
+        price: 18.7,
+        dailyChange: 2.18,
+        thesis: "光纤光缆通信方向，博弈算力链和通信链回流。",
+        tags: ["通信", "题材", "短中结合"],
+        targetPrice: 22,
+        stopLoss: 17,
+        weight: 24
+      },
+      {
+        code: "002130",
+        name: "沃尔核材",
+        shares: 2400,
+        cost: 21.468,
+        price: 22.36,
+        dailyChange: 1.94,
+        thesis: "铜缆高速连接核心票，做算力链补涨与趋势延续。",
+        tags: ["算力链", "高速连接", "趋势仓"],
+        targetPrice: 24.8,
+        stopLoss: 20.6,
+        weight: 31
+      },
+      {
+        code: "300857",
+        name: "协创数据",
+        shares: 500,
+        cost: 63.825,
+        price: 66.18,
+        dailyChange: 3.26,
+        thesis: "AI 边缘算力与存储方向，博弈高景气延续。",
+        tags: ["AI", "算力", "弹性"],
+        targetPrice: 72.5,
+        stopLoss: 59.2,
+        weight: 18
+      }
+    ],
+    trades: [
+      {
+        id: "cc-001",
+        date: "2026-05-03",
+        action: "buy",
+        code: "002491",
+        name: "通鼎互联",
+        price: 15.92,
+        shares: 700,
+        note: "回踩五日线承接，补趋势仓。"
+      },
+      {
+        id: "cc-002",
+        date: "2026-04-29",
+        action: "buy",
+        code: "002130",
+        name: "沃尔核材",
+        price: 21.06,
+        shares: 1000,
+        note: "算力链走强，半路切入。"
+      }
+    ]
+  },
+  {
+    id: "qiqi",
+    label: "七加一持仓",
+    description: "偏防守反击，兼顾红利与顺周期资源。",
+    cashEstimate: 138000,
+    holdings: [
+      {
+        code: "600938",
+        name: "中国海油",
+        shares: 2600,
+        cost: 28.126,
+        price: 29.41,
+        dailyChange: 0.88,
+        thesis: "高股息底仓，油价中枢稳定时提供防守收益。",
+        tags: ["高股息", "能源", "防御"],
+        targetPrice: 31.5,
+        stopLoss: 27.1,
+        weight: 29
+      },
+      {
+        code: "601899",
+        name: "紫金矿业",
+        shares: 3200,
+        cost: 16.028,
+        price: 17.08,
+        dailyChange: 0.76,
+        thesis: "铜金资源顺周期，承担防守中的进攻弹性。",
+        tags: ["资源", "顺周期", "核心仓"],
+        targetPrice: 18.9,
+        stopLoss: 15.2,
+        weight: 23
+      },
+      {
+        code: "000333",
+        name: "美的集团",
+        shares: 900,
+        cost: 67.352,
+        price: 71.06,
+        dailyChange: 0.54,
+        thesis: "家电龙头现金流稳定，适合平衡组合波动。",
+        tags: ["家电", "白马", "低波动"],
+        targetPrice: 75.8,
+        stopLoss: 64.5,
+        weight: 16
+      }
+    ],
+    trades: [
+      {
+        id: "qj-001",
+        date: "2026-04-30",
+        action: "buy",
+        code: "600938",
+        name: "中国海油",
+        price: 27.88,
+        shares: 1200,
+        note: "红利仓继续累积。"
+      },
+      {
+        id: "qj-002",
+        date: "2026-04-22",
+        action: "sell",
+        code: "000333",
+        name: "美的集团",
+        price: 70.25,
+        shares: 300,
+        note: "冲高减一部分做仓位平衡。"
+      }
+    ]
+  },
+  {
+    id: "leo",
+    label: "leo短线持仓",
+    description: "高换手短线组合，更重视节奏和止损纪律。",
+    cashEstimate: 56000,
+    holdings: [
+      {
+        code: "603728",
+        name: "鸣志电器",
+        shares: 700,
+        cost: 56.318,
+        price: 58.41,
+        dailyChange: 5.62,
+        thesis: "机器人执行器前排，做强势延续和连板情绪外溢。",
+        tags: ["机器人", "短线", "龙头博弈"],
+        targetPrice: 63.6,
+        stopLoss: 54.8,
+        weight: 33
+      },
+      {
+        code: "002085",
+        name: "万丰奥威",
+        shares: 1800,
+        cost: 16.842,
+        price: 17.62,
+        dailyChange: 6.88,
+        thesis: "低空经济高辨识度核心票，围绕主线情绪做滚动。",
+        tags: ["低空经济", "高辨识度", "短线"],
+        targetPrice: 19.3,
+        stopLoss: 16.2,
+        weight: 27
+      },
+      {
+        code: "601127",
+        name: "赛力斯",
+        shares: 300,
+        cost: 94.256,
+        price: 97.15,
+        dailyChange: 4.12,
+        thesis: "智能汽车趋势龙头，做高位趋势仓位试错。",
+        tags: ["智能汽车", "趋势", "弹性仓"],
+        targetPrice: 103.8,
+        stopLoss: 91.4,
+        weight: 21
+      }
+    ],
+    trades: [
+      {
+        id: "leo-001",
+        date: "2026-05-05",
+        action: "buy",
+        code: "603728",
+        name: "鸣志电器",
+        price: 55.8,
+        shares: 300,
+        note: "早盘放量突破后追涨试仓。"
+      },
+      {
+        id: "leo-002",
+        date: "2026-05-02",
+        action: "buy",
+        code: "002085",
+        name: "万丰奥威",
+        price: 16.22,
+        shares: 900,
+        note: "低空经济加强，拿先手。"
+      }
+    ]
   }
 ];
 

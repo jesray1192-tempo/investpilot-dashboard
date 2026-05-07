@@ -1,16 +1,15 @@
 import { ChangeEvent, DragEvent, FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
 import {
   dataSources,
-  holdings,
   marketBreadth,
   marketEvents,
-  riskSignals,
-  tradeRecords
+  portfolioProfiles,
+  riskSignals
 } from "./data/mock";
 import { fetchLiveLimitUpPool } from "./services/limitUpPool";
 import { fetchLiveMarketIndices } from "./services/marketIndices";
-import { fetchLiveStockDetail, fetchLiveStockTrend } from "./services/stockDetail";
-import { Holding, LimitUpStock, MarketIndex, StockDetail, StockTrendPoint } from "./types";
+import { fetchLiveStockDetail, fetchLiveStockTrend, fetchStockSearchMatch } from "./services/stockDetail";
+import { Holding, LimitUpStock, MarketIndex, PortfolioProfile, StockDetail, StockTrendPoint } from "./types";
 
 type NavKey =
   | "home"
@@ -46,7 +45,6 @@ type HoldingFormState = {
   name: string;
   shares: string;
   cost: string;
-  price: string;
   targetPrice: string;
   stopLoss: string;
   thesis: string;
@@ -291,6 +289,15 @@ function currency(value: number) {
   }).format(value);
 }
 
+function currencyWithPrecision(value: number, digits: number) {
+  return new Intl.NumberFormat("zh-CN", {
+    style: "currency",
+    currency: "CNY",
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits
+  }).format(value);
+}
+
 function percent(value: number) {
   return `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
 }
@@ -352,7 +359,6 @@ const emptyHoldingForm: HoldingFormState = {
   name: "",
   shares: "",
   cost: "",
-  price: "",
   targetPrice: "",
   stopLoss: "",
   thesis: ""
@@ -364,7 +370,6 @@ function holdingToFormState(item: Holding): HoldingFormState {
     name: item.name,
     shares: `${item.shares}`,
     cost: `${item.cost}`,
-    price: `${item.price}`,
     targetPrice: typeof item.targetPrice === "number" ? `${item.targetPrice}` : "",
     stopLoss: typeof item.stopLoss === "number" ? `${item.stopLoss}` : "",
     thesis: item.thesis
@@ -497,16 +502,29 @@ export default function App() {
   const [stockTrendPoints, setStockTrendPoints] = useState<StockTrendPoint[]>([]);
   const [stockTrendLoading, setStockTrendLoading] = useState(false);
   const [stockTrendError, setStockTrendError] = useState("");
-  const [portfolio, setPortfolio] = useState<Holding[]>(holdings);
+  const [portfolioProfilesState, setPortfolioProfilesState] = useState<PortfolioProfile[]>(portfolioProfiles);
+  const [activePortfolioProfileId, setActivePortfolioProfileId] = useState<string>(portfolioProfiles[0]?.id ?? "mine");
   const [isHoldingEditorOpen, setIsHoldingEditorOpen] = useState(false);
   const [holdingEditorMode, setHoldingEditorMode] = useState<"create" | "edit">("create");
   const [editingHoldingCode, setEditingHoldingCode] = useState<string | null>(null);
   const [holdingForm, setHoldingForm] = useState<HoldingFormState>(emptyHoldingForm);
   const [holdingFormError, setHoldingFormError] = useState("");
+  const [holdingQuotePreview, setHoldingQuotePreview] = useState<number | null>(null);
+  const [portfolioQuotesUpdatedAt, setPortfolioQuotesUpdatedAt] = useState("");
+  const activePortfolioProfile = useMemo(
+    () =>
+      portfolioProfilesState.find((profile) => profile.id === activePortfolioProfileId) ??
+      portfolioProfilesState[0],
+    [activePortfolioProfileId, portfolioProfilesState]
+  );
+  const portfolio = activePortfolioProfile?.holdings ?? [];
+  const activeTradeRecords = activePortfolioProfile?.trades ?? [];
+  const activePortfolioCashEstimate = activePortfolioProfile?.cashEstimate ?? 0;
   const marketValue = useMemo(() => totalMarketValue(portfolio), [portfolio]);
   const costValue = useMemo(() => totalCostValue(portfolio), [portfolio]);
   const pnl = marketValue - costValue;
   const pnlPercent = (pnl / costValue) * 100;
+  const isEditablePortfolio = activePortfolioProfile?.id === "mine";
 
   const riskScore = useMemo(() => {
     return Math.round(
@@ -751,11 +769,14 @@ export default function App() {
 
   const currentNav = navItems.find((item) => item.key === activeNav) ?? navItems[0];
   const homeHeadline = marketEvents[0];
-  const investedRatio = Math.round((marketValue / (marketValue + 185000)) * 100);
+  const investedRatio = Math.round((marketValue / (marketValue + activePortfolioCashEstimate)) * 100);
   const dailyPnl = portfolio.reduce(
     (sum, item) => sum + item.shares * item.price * (item.dailyChange / 100),
     0
   );
+  const disciplineCoverageCount = portfolio.filter(
+    (item) => typeof item.targetPrice === "number" && typeof item.stopLoss === "number"
+  ).length;
   const maxLimitUpHeight = limitUpStocks.length
     ? Math.max(...limitUpStocks.map((stock) => stock.consecutiveBoardCount))
     : 0;
@@ -772,12 +793,18 @@ export default function App() {
     () => buildMultimodalOutput(uploadAssets, aiLinkInput, aiNoteInput, analysisRuns),
     [uploadAssets, aiLinkInput, aiNoteInput, analysisRuns]
   );
+  const portfolioCodes = useMemo(() => portfolio.map((item) => item.code), [portfolio]);
+  const portfolioCodeSignature = useMemo(
+    () => [...portfolioCodes].sort((left, right) => left.localeCompare(right, "zh-CN")).join(","),
+    [portfolioCodes]
+  );
 
   function openCreateHoldingEditor() {
     setHoldingEditorMode("create");
     setEditingHoldingCode(null);
     setHoldingForm(emptyHoldingForm);
     setHoldingFormError("");
+    setHoldingQuotePreview(null);
     setIsHoldingEditorOpen(true);
   }
 
@@ -786,6 +813,7 @@ export default function App() {
     setEditingHoldingCode(item.code);
     setHoldingForm(holdingToFormState(item));
     setHoldingFormError("");
+    setHoldingQuotePreview(item.price);
     setIsHoldingEditorOpen(true);
   }
 
@@ -794,6 +822,20 @@ export default function App() {
     setHoldingFormError("");
     setEditingHoldingCode(null);
     setHoldingForm(emptyHoldingForm);
+    setHoldingQuotePreview(null);
+  }
+
+  function updateActivePortfolioHoldings(updater: (current: Holding[]) => Holding[]) {
+    setPortfolioProfilesState((current) =>
+      current.map((profile) =>
+        profile.id === activePortfolioProfileId
+          ? {
+              ...profile,
+              holdings: updater(profile.holdings)
+            }
+          : profile
+      )
+    );
   }
 
   function handleHoldingFormChange(event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
@@ -809,7 +851,6 @@ export default function App() {
     const normalizedThesis = holdingForm.thesis.trim();
     const shares = Number(holdingForm.shares);
     const cost = Number(holdingForm.cost);
-    const price = Number(holdingForm.price);
     const targetPrice = holdingForm.targetPrice.trim() ? Number(holdingForm.targetPrice) : undefined;
     const stopLoss = holdingForm.stopLoss.trim() ? Number(holdingForm.stopLoss) : undefined;
 
@@ -818,8 +859,8 @@ export default function App() {
       return;
     }
 
-    if ([shares, cost, price].some((value) => !Number.isFinite(value) || value <= 0)) {
-      setHoldingFormError("持仓股数、成本价和现价必须是大于 0 的数字。");
+    if ([shares, cost].some((value) => !Number.isFinite(value) || value <= 0)) {
+      setHoldingFormError("持仓股数和成本价必须是大于 0 的数字。");
       return;
     }
 
@@ -845,7 +886,7 @@ export default function App() {
       name: normalizedName,
       shares,
       cost,
-      price,
+      price: editingItem?.price ?? existingCodeItem?.price ?? 0,
       dailyChange: editingItem?.dailyChange ?? existingCodeItem?.dailyChange ?? 0,
       thesis: normalizedThesis,
       tags: editingItem?.tags ?? existingCodeItem?.tags ?? [],
@@ -853,7 +894,7 @@ export default function App() {
       stopLoss
     };
 
-    setPortfolio((current) => {
+    updateActivePortfolioHoldings((current) => {
       if (holdingEditorMode === "edit" && editingHoldingCode) {
         return current.map((item) => (item.code === editingHoldingCode ? nextHolding : item));
       }
@@ -875,8 +916,187 @@ export default function App() {
       return;
     }
 
-    setPortfolio((current) => current.filter((entry) => entry.code !== code));
+    updateActivePortfolioHoldings((current) => current.filter((entry) => entry.code !== code));
   }
+
+  useEffect(() => {
+    closeHoldingEditor();
+    setActivePortfolioTab("holdings");
+  }, [activePortfolioProfileId]);
+
+  useEffect(() => {
+    if (!isHoldingEditorOpen) {
+      return;
+    }
+
+    const normalizedCode = holdingForm.code.trim();
+
+    if (!/^\d{6}$/.test(normalizedCode)) {
+      return;
+    }
+
+    let disposed = false;
+    const timer = window.setTimeout(async () => {
+      try {
+        const detail = await fetchLiveStockDetail(normalizedCode);
+
+        if (disposed) {
+          return;
+        }
+
+        setHoldingForm((current) => {
+          if (current.code.trim() !== normalizedCode) {
+            return current;
+          }
+
+          if (current.name === detail.name) {
+            return current;
+          }
+
+          return {
+            ...current,
+            code: detail.code,
+            name: detail.name
+          };
+        });
+        setHoldingQuotePreview(detail.price);
+      } catch {
+        if (!disposed) {
+          setHoldingQuotePreview(null);
+        }
+      }
+    }, 300);
+
+    return () => {
+      disposed = true;
+      window.clearTimeout(timer);
+    };
+  }, [holdingForm.code, isHoldingEditorOpen]);
+
+  useEffect(() => {
+    if (!isHoldingEditorOpen) {
+      return;
+    }
+
+    const normalizedName = holdingForm.name.trim();
+
+    if (normalizedName.length < 2) {
+      return;
+    }
+
+    let disposed = false;
+    const timer = window.setTimeout(async () => {
+      try {
+        const match = await fetchStockSearchMatch(normalizedName);
+
+        if (disposed) {
+          return;
+        }
+
+        const detail = await fetchLiveStockDetail(match.code);
+
+        if (disposed) {
+          return;
+        }
+
+        setHoldingForm((current) => {
+          if (current.name.trim() !== normalizedName) {
+            return current;
+          }
+
+          if (current.code === detail.code && current.name === detail.name) {
+            return current;
+          }
+
+          return {
+            ...current,
+            code: detail.code,
+            name: detail.name
+          };
+        });
+        setHoldingQuotePreview(detail.price);
+      } catch {
+        if (!disposed && holdingForm.code.trim() === "") {
+          setHoldingQuotePreview(null);
+        }
+      }
+    }, 300);
+
+    return () => {
+      disposed = true;
+      window.clearTimeout(timer);
+    };
+  }, [holdingForm.code, holdingForm.name, isHoldingEditorOpen]);
+
+  useEffect(() => {
+    if (!portfolioCodeSignature) {
+      setPortfolioQuotesUpdatedAt("");
+      return;
+    }
+
+    let disposed = false;
+    let refreshTimer = 0;
+
+    const refreshPortfolioQuotes = async () => {
+      const results = await Promise.allSettled(
+        portfolioCodes.map((code) => fetchLiveStockDetail(code))
+      );
+
+      if (disposed) {
+        return;
+      }
+
+      const detailMap = new Map(
+        results.flatMap((result) =>
+          result.status === "fulfilled" ? [[result.value.code, result.value] as const] : []
+        )
+      );
+
+      if (detailMap.size === 0) {
+        return;
+      }
+
+      updateActivePortfolioHoldings((current) =>
+        current.map((item) => {
+          const detail = detailMap.get(item.code);
+
+          if (!detail) {
+            return item;
+          }
+
+          if (
+            item.name === detail.name &&
+            item.price === detail.price &&
+            item.dailyChange === detail.changePercent
+          ) {
+            return item;
+          }
+
+          return {
+            ...item,
+            name: detail.name,
+            price: detail.price,
+            dailyChange: detail.changePercent
+          };
+        })
+      );
+      setPortfolioQuotesUpdatedAt(
+        new Date().toLocaleTimeString("zh-CN", {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit"
+        })
+      );
+    };
+
+    refreshPortfolioQuotes();
+    refreshTimer = window.setInterval(refreshPortfolioQuotes, 30000);
+
+    return () => {
+      disposed = true;
+      window.clearInterval(refreshTimer);
+    };
+  }, [activePortfolioProfileId, portfolioCodeSignature, portfolioCodes]);
 
   useEffect(() => {
     if (!selectedLimitUpBoard) {
@@ -1983,12 +2203,26 @@ export default function App() {
 
         {activeNav === "portfolio" && (
           <section className="portfolio-view">
+            <div className="portfolio-profile-tabs">
+              {portfolioProfilesState.map((profile) => (
+                <button
+                  key={profile.id}
+                  type="button"
+                  className={`portfolio-profile-tab ${activePortfolioProfileId === profile.id ? "active" : ""}`}
+                  onClick={() => setActivePortfolioProfileId(profile.id)}
+                >
+                  <strong>{profile.label}</strong>
+                  <span>{profile.description}</span>
+                </button>
+              ))}
+            </div>
+
             <section className="overview-grid">
               <article className="card full-span portfolio-overview-card">
                 <div className="card-head">
                   <div>
                     <p className="section-kicker">Portfolio Overview</p>
-                    <h2>持仓总览</h2>
+                    <h2>{activePortfolioProfile?.label ?? "持仓总览"}</h2>
                   </div>
                 </div>
                 <div className="portfolio-metric-grid">
@@ -2005,12 +2239,14 @@ export default function App() {
                   <div className="portfolio-metric-tile">
                     <span>仓位</span>
                     <strong>{investedRatio}%</strong>
-                    <small>现金估算 {currency(185000)}</small>
+                    <small>现金估算 {currency(activePortfolioCashEstimate)}</small>
                   </div>
                   <div className="portfolio-metric-tile">
                     <span>纪律执行</span>
-                    <strong className="up">3 / 4</strong>
-                    <small>目标价与止损覆盖 100%</small>
+                    <strong className="up">
+                      {disciplineCoverageCount} / {portfolio.length}
+                    </strong>
+                    <small>目标价与止损覆盖 {portfolio.length ? Math.round((disciplineCoverageCount / portfolio.length) * 100) : 0}%</small>
                   </div>
                 </div>
               </article>
@@ -2021,7 +2257,7 @@ export default function App() {
                 <div className="card-head">
                   <div>
                     <p className="section-kicker">Portfolio Book</p>
-                    <h2>持仓与交易</h2>
+                    <h2>{activePortfolioProfile?.label ?? "持仓与交易"}</h2>
                   </div>
                 </div>
                 <div className="subnav-row">
@@ -2045,15 +2281,20 @@ export default function App() {
                   <div className="portfolio-manager">
                     <div className="portfolio-toolbar">
                       <div className="portfolio-toolbar-copy">
-                        <strong>持仓管理</strong>
-                        <span>支持新增、编辑和删除当前持仓股票。</span>
+                        <strong>{isEditablePortfolio ? "持仓管理" : "实盘持仓"}</strong>
+                        <span>
+                          {isEditablePortfolio ? "支持新增、编辑和删除当前持仓股票。" : "当前组合用于对比观察，支持整页切换查看。"} 现价按实时行情更新
+                          {portfolioQuotesUpdatedAt ? ` · ${portfolioQuotesUpdatedAt}` : ""}。
+                        </span>
                       </div>
-                      <button type="button" className="action-btn" onClick={openCreateHoldingEditor}>
-                        新增股票
-                      </button>
+                      {isEditablePortfolio && (
+                        <button type="button" className="action-btn" onClick={openCreateHoldingEditor}>
+                          新增股票
+                        </button>
+                      )}
                     </div>
 
-                    {isHoldingEditorOpen && (
+                    {isEditablePortfolio && isHoldingEditorOpen && (
                       <form className="holding-editor" onSubmit={handleHoldingSubmit}>
                         <div className="holding-editor-head">
                           <div>
@@ -2106,25 +2347,20 @@ export default function App() {
                               name="cost"
                               type="number"
                               min="0"
-                              step="0.01"
+                              step="0.001"
                               value={holdingForm.cost}
                               onChange={handleHoldingFormChange}
-                              placeholder="如 23.56"
+                              placeholder="如 23.568"
                             />
                           </label>
-                          <label className="holding-form-field">
+                          <div className="holding-form-field">
                             <span>现价</span>
-                            <input
-                              className="real-input"
-                              name="price"
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={holdingForm.price}
-                              onChange={handleHoldingFormChange}
-                              placeholder="如 24.12"
-                            />
-                          </label>
+                            <div className="fake-input">
+                              {holdingQuotePreview === null
+                                ? "自动按股票代码或名称拉取实时行情"
+                                : currency(holdingQuotePreview)}
+                            </div>
+                          </div>
                           <label className="holding-form-field">
                             <span>目标价</span>
                             <input
@@ -2132,10 +2368,10 @@ export default function App() {
                               name="targetPrice"
                               type="number"
                               min="0"
-                              step="0.01"
+                              step="0.001"
                               value={holdingForm.targetPrice}
                               onChange={handleHoldingFormChange}
-                              placeholder="如 28.00"
+                              placeholder="如 28.123"
                             />
                           </label>
                           <label className="holding-form-field">
@@ -2145,10 +2381,10 @@ export default function App() {
                               name="stopLoss"
                               type="number"
                               min="0"
-                              step="0.01"
+                              step="0.001"
                               value={holdingForm.stopLoss}
                               onChange={handleHoldingFormChange}
-                              placeholder="如 21.50"
+                              placeholder="如 21.456"
                             />
                           </label>
                           <label className="holding-form-field holding-form-field-wide">
@@ -2204,7 +2440,7 @@ export default function App() {
                                 }
                               />
                               <FieldValue label="持仓股数" value={item.shares} />
-                              <FieldValue label="成本价" value={currency(item.cost)} />
+                              <FieldValue label="成本价" value={currencyWithPrecision(item.cost, 3)} />
                               <FieldValue label="现价" value={currency(item.price)} />
                               <FieldValue
                                 label="总盈亏"
@@ -2216,7 +2452,7 @@ export default function App() {
                               />
                               <FieldValue
                                 label="纪律"
-                                value={`目标 ${item.targetPrice} / 止损 ${item.stopLoss}`}
+                                value={`目标 ${formatPlainNumber(item.targetPrice ?? null, 3)} / 止损 ${formatPlainNumber(item.stopLoss ?? null, 3)}`}
                               />
                               <FieldValue
                                 label="买入逻辑"
@@ -2227,22 +2463,26 @@ export default function App() {
                                 label="操作"
                                 className="row-action-cell"
                                 value={
-                                  <div className="row-actions">
-                                    <button
-                                      type="button"
-                                      className="inline-action-btn"
-                                      onClick={() => openEditHoldingEditor(item)}
-                                    >
-                                      编辑
-                                    </button>
-                                    <button
-                                      type="button"
-                                      className="inline-action-btn danger"
-                                      onClick={() => handleDeleteHolding(item.code)}
-                                    >
-                                      删除
-                                    </button>
-                                  </div>
+                                  isEditablePortfolio ? (
+                                    <div className="row-actions">
+                                      <button
+                                        type="button"
+                                        className="inline-action-btn"
+                                        onClick={() => openEditHoldingEditor(item)}
+                                      >
+                                        编辑
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="inline-action-btn danger"
+                                        onClick={() => handleDeleteHolding(item.code)}
+                                      >
+                                        删除
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <span className="topbar-note">只读对比</span>
+                                  )
                                 }
                               />
                             </div>
@@ -2255,7 +2495,7 @@ export default function App() {
 
                 {activePortfolioTab === "trades" && (
                   <div className="trade-list">
-                    {tradeRecords.map((trade) => (
+                    {activeTradeRecords.map((trade) => (
                       <div className="trade-item" key={trade.id}>
                         <div>
                           <strong>

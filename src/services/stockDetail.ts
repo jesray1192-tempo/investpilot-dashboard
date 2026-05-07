@@ -1,5 +1,10 @@
 import { StockDetail, StockTrendPoint } from "../types";
 
+type StockSearchMatch = {
+  code: string;
+  name: string;
+};
+
 type EastmoneyStockDetailResponse = {
   data?: {
     f43?: number;
@@ -32,6 +37,15 @@ type EastmoneyStockDetailResponse = {
 type EastmoneyStockTrendResponse = {
   data?: {
     trends?: string[];
+  };
+};
+
+type EastmoneyStockSearchResponse = {
+  QuotationCodeTable?: {
+    Data?: Array<{
+      Code?: string;
+      Name?: string;
+    }>;
   };
 };
 
@@ -167,4 +181,33 @@ export async function fetchLiveStockTrend(code: string, days: 1 | 5): Promise<St
   }
 
   return points;
+}
+
+export async function fetchStockSearchMatch(query: string): Promise<StockSearchMatch> {
+  const normalizedQuery = query.trim();
+
+  if (!normalizedQuery) {
+    throw new Error("请输入股票代码或名称。");
+  }
+
+  const response = await jsonp<EastmoneyStockSearchResponse>(
+    `https://searchadapter.eastmoney.com/api/suggest/get?input=${encodeURIComponent(normalizedQuery)}&type=14&token=D43BF722C8E33BDC906FB84D85E326E8&count=10`
+  );
+  const candidates =
+    response.QuotationCodeTable?.Data?.filter(
+      (item): item is { Code: string; Name: string } => Boolean(item.Code && item.Name)
+    ) ?? [];
+
+  const exactMatch =
+    candidates.find((item) => item.Code === normalizedQuery || item.Name === normalizedQuery) ??
+    candidates[0];
+
+  if (!exactMatch) {
+    throw new Error("未找到匹配的股票代码或名称。");
+  }
+
+  return {
+    code: exactMatch.Code,
+    name: exactMatch.Name
+  };
 }
