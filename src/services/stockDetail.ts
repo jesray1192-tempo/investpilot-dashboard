@@ -7,7 +7,7 @@ type StockSearchMatch = {
 
 type StockQuoteSnapshot = {
   code: string;
-  name: string;
+  name: string | null;
   price: number;
   changePercent: number;
 };
@@ -232,10 +232,14 @@ export async function fetchLiveStockQuoteSnapshot(code: string): Promise<StockQu
   const detail = detailResult.status === "fulfilled" ? detailResult.value : null;
   const trend = trendResult.status === "fulfilled" ? trendResult.value : [];
   const latestTrendPoint = trend.length > 0 ? trend[trend.length - 1] : null;
+  const searchMatch =
+    detail?.name
+      ? null
+      : await fetchStockSearchMatch(code).catch(() => null);
 
   return {
     code: detail?.code ?? code,
-    name: detail?.name ?? code,
+    name: detail?.name ?? searchMatch?.name ?? null,
     price: latestTrendPoint?.price ?? detail?.price ?? 0,
     changePercent: detail?.changePercent ?? 0
   };

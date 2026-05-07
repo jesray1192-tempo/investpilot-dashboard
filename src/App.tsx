@@ -957,7 +957,7 @@ export default function App() {
         const matchedName =
           matchResult.status === "fulfilled"
             ? matchResult.value.name
-            : quoteResult.status === "fulfilled" && quoteResult.value.name !== normalizedCode
+            : quoteResult.status === "fulfilled" && quoteResult.value.name
               ? quoteResult.value.name
               : "";
 
@@ -1027,14 +1027,14 @@ export default function App() {
             return current;
           }
 
-          if (current.code === detail.code && current.name === detail.name) {
+          if (current.code === detail.code && current.name === (detail.name ?? current.name)) {
             return current;
           }
 
           return {
             ...current,
             code: detail.code,
-            name: detail.name
+            name: detail.name ?? current.name
           };
         });
         setHoldingQuotePreview(detail.price);
@@ -1088,7 +1088,7 @@ export default function App() {
           }
 
           if (
-            item.name === detail.name &&
+            item.name === (detail.name ?? item.name) &&
             item.price === detail.price &&
             item.dailyChange === detail.changePercent
           ) {
@@ -1097,7 +1097,7 @@ export default function App() {
 
           return {
             ...item,
-            name: detail.name,
+            name: detail.name ?? item.name,
             price: detail.price,
             dailyChange: detail.changePercent
           };
