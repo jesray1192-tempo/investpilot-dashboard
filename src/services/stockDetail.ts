@@ -5,6 +5,13 @@ type StockSearchMatch = {
   name: string;
 };
 
+type StockQuoteSnapshot = {
+  code: string;
+  name: string;
+  price: number;
+  changePercent: number;
+};
+
 type EastmoneyStockDetailResponse = {
   data?: {
     f43?: number;
@@ -209,5 +216,27 @@ export async function fetchStockSearchMatch(query: string): Promise<StockSearchM
   return {
     code: exactMatch.Code,
     name: exactMatch.Name
+  };
+}
+
+export async function fetchLiveStockQuoteSnapshot(code: string): Promise<StockQuoteSnapshot> {
+  const [detailResult, trendResult] = await Promise.allSettled([
+    fetchLiveStockDetail(code),
+    fetchLiveStockTrend(code, 1)
+  ]);
+
+  if (detailResult.status !== "fulfilled" && trendResult.status !== "fulfilled") {
+    throw new Error("未取到实时行情快照。");
+  }
+
+  const detail = detailResult.status === "fulfilled" ? detailResult.value : null;
+  const trend = trendResult.status === "fulfilled" ? trendResult.value : [];
+  const latestTrendPoint = trend.length > 0 ? trend[trend.length - 1] : null;
+
+  return {
+    code: detail?.code ?? code,
+    name: detail?.name ?? code,
+    price: latestTrendPoint?.price ?? detail?.price ?? 0,
+    changePercent: detail?.changePercent ?? 0
   };
 }

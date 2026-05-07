@@ -8,7 +8,12 @@ import {
 } from "./data/mock";
 import { fetchLiveLimitUpPool } from "./services/limitUpPool";
 import { fetchLiveMarketIndices } from "./services/marketIndices";
-import { fetchLiveStockDetail, fetchLiveStockTrend, fetchStockSearchMatch } from "./services/stockDetail";
+import {
+  fetchLiveStockDetail,
+  fetchLiveStockQuoteSnapshot,
+  fetchLiveStockTrend,
+  fetchStockSearchMatch
+} from "./services/stockDetail";
 import { Holding, LimitUpStock, MarketIndex, PortfolioProfile, StockDetail, StockTrendPoint } from "./types";
 
 type NavKey =
@@ -938,28 +943,45 @@ export default function App() {
     let disposed = false;
     const timer = window.setTimeout(async () => {
       try {
-        const detail = await fetchLiveStockDetail(normalizedCode);
+        const [matchResult, quoteResult] = await Promise.allSettled([
+          fetchStockSearchMatch(normalizedCode),
+          fetchLiveStockQuoteSnapshot(normalizedCode)
+        ]);
 
         if (disposed) {
           return;
         }
+
+        const matchedCode =
+          matchResult.status === "fulfilled" ? matchResult.value.code : normalizedCode;
+        const matchedName =
+          matchResult.status === "fulfilled"
+            ? matchResult.value.name
+            : quoteResult.status === "fulfilled" && quoteResult.value.name !== normalizedCode
+              ? quoteResult.value.name
+              : "";
 
         setHoldingForm((current) => {
           if (current.code.trim() !== normalizedCode) {
             return current;
           }
 
-          if (current.name === detail.name) {
+          if (current.code === matchedCode && current.name === matchedName) {
             return current;
           }
 
           return {
             ...current,
-            code: detail.code,
-            name: detail.name
+            code: matchedCode,
+            name: matchedName
           };
         });
-        setHoldingQuotePreview(detail.price);
+
+        if (quoteResult.status === "fulfilled") {
+          setHoldingQuotePreview(quoteResult.value.price);
+        } else if (matchResult.status === "rejected") {
+          setHoldingQuotePreview(null);
+        }
       } catch {
         if (!disposed) {
           setHoldingQuotePreview(null);
@@ -979,8 +1001,9 @@ export default function App() {
     }
 
     const normalizedName = holdingForm.name.trim();
+    const normalizedCode = holdingForm.code.trim();
 
-    if (normalizedName.length < 2) {
+    if (normalizedName.length < 2 || /^\d{6}$/.test(normalizedCode)) {
       return;
     }
 
@@ -993,7 +1016,7 @@ export default function App() {
           return;
         }
 
-        const detail = await fetchLiveStockDetail(match.code);
+        const detail = await fetchLiveStockQuoteSnapshot(match.code);
 
         if (disposed) {
           return;
@@ -1016,7 +1039,7 @@ export default function App() {
         });
         setHoldingQuotePreview(detail.price);
       } catch {
-        if (!disposed && holdingForm.code.trim() === "") {
+        if (!disposed && normalizedCode === "") {
           setHoldingQuotePreview(null);
         }
       }
@@ -1039,7 +1062,7 @@ export default function App() {
 
     const refreshPortfolioQuotes = async () => {
       const results = await Promise.allSettled(
-        portfolioCodes.map((code) => fetchLiveStockDetail(code))
+        portfolioCodes.map((code) => fetchLiveStockQuoteSnapshot(code))
       );
 
       if (disposed) {
