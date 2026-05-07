@@ -87,6 +87,21 @@ function jsonp<T>(url: string, callbackParam = "cb") {
   });
 }
 
+async function fetchJson<T>(url: string): Promise<T> {
+  const response = await fetch(url, {
+    method: "GET",
+    headers: {
+      Accept: "application/json, text/plain, */*"
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`请求失败: ${response.status}`);
+  }
+
+  return (await response.json()) as T;
+}
+
 function resolveSecid(code: string) {
   if (code.startsWith("6") || code.startsWith("9") || code.startsWith("5")) {
     return `1.${code}`;
@@ -137,8 +152,9 @@ function parseTrendPoint(item: string): StockTrendPoint | null {
 
 export async function fetchLiveStockDetail(code: string): Promise<StockDetail> {
   const secid = resolveSecid(code);
-  const response = await jsonp<EastmoneyStockDetailResponse>(
-    `https://push2.eastmoney.com/api/qt/stock/get?fltt=2&invt=2&fields=f43,f44,f45,f46,f47,f48,f50,f51,f52,f57,f58,f60,f71,f84,f85,f116,f117,f127,f162,f167,f168,f169,f170,f171&secid=${secid}&ut=fa5fd1943c7b386f172d6893dbfba10b`
+  const url = `https://push2.eastmoney.com/api/qt/stock/get?fltt=2&invt=2&fields=f43,f44,f45,f46,f47,f48,f50,f51,f52,f57,f58,f60,f71,f84,f85,f116,f117,f127,f162,f167,f168,f169,f170,f171&secid=${secid}&ut=fa5fd1943c7b386f172d6893dbfba10b`;
+  const response = await fetchJson<EastmoneyStockDetailResponse>(url).catch(() =>
+    jsonp<EastmoneyStockDetailResponse>(url)
   );
   const data = response.data;
 
@@ -177,8 +193,9 @@ export async function fetchLiveStockDetail(code: string): Promise<StockDetail> {
 
 export async function fetchLiveStockTrend(code: string, days: 1 | 5): Promise<StockTrendPoint[]> {
   const secid = resolveSecid(code);
-  const response = await jsonp<EastmoneyStockTrendResponse>(
-    `https://push2his.eastmoney.com/api/qt/stock/trends2/get?fields1=f1,f2,f3,f4,f5,f6,f7,f8&fields2=f51,f52,f53,f54,f55,f56,f57,f58&iscr=0&ndays=${days}&secid=${secid}&ut=7eea3edcaed734bea9cbfc24409ed989`
+  const url = `https://push2his.eastmoney.com/api/qt/stock/trends2/get?fields1=f1,f2,f3,f4,f5,f6,f7,f8&fields2=f51,f52,f53,f54,f55,f56,f57,f58&iscr=0&ndays=${days}&secid=${secid}&ut=7eea3edcaed734bea9cbfc24409ed989`;
+  const response = await fetchJson<EastmoneyStockTrendResponse>(url).catch(() =>
+    jsonp<EastmoneyStockTrendResponse>(url)
   );
   const trends = response.data?.trends ?? [];
   const points = trends.map(parseTrendPoint).filter(Boolean) as StockTrendPoint[];
@@ -197,8 +214,9 @@ export async function fetchStockSearchMatch(query: string): Promise<StockSearchM
     throw new Error("请输入股票代码或名称。");
   }
 
-  const response = await jsonp<EastmoneyStockSearchResponse>(
-    `https://searchadapter.eastmoney.com/api/suggest/get?input=${encodeURIComponent(normalizedQuery)}&type=14&token=D43BF722C8E33BDC906FB84D85E326E8&count=10`
+  const url = `https://searchadapter.eastmoney.com/api/suggest/get?input=${encodeURIComponent(normalizedQuery)}&type=14&token=D43BF722C8E33BDC906FB84D85E326E8&count=10`;
+  const response = await fetchJson<EastmoneyStockSearchResponse>(url).catch(() =>
+    jsonp<EastmoneyStockSearchResponse>(url)
   );
   const candidates =
     response.QuotationCodeTable?.Data?.filter(
