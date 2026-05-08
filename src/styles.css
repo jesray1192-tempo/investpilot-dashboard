@@ -1691,6 +1691,209 @@ h2 {
   gap: 16px;
 }
 
+.portfolio-ai-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+  gap: 18px;
+}
+
+.portfolio-ai-roadmap {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.portfolio-ai-roadmap-item,
+.portfolio-ai-funding {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.015)),
+    rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 20px;
+  padding: 18px;
+}
+
+.portfolio-ai-roadmap-item {
+  display: grid;
+  gap: 8px;
+}
+
+.portfolio-ai-roadmap-item span {
+  color: rgba(242, 239, 232, 0.56);
+  font-size: 0.84rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.portfolio-ai-roadmap-item strong,
+.portfolio-ai-funding strong {
+  font-size: 1.02rem;
+  line-height: 1.45;
+}
+
+.portfolio-ai-roadmap-item p,
+.portfolio-ai-funding-item p {
+  margin: 0;
+  color: rgba(242, 239, 232, 0.74);
+  line-height: 1.65;
+}
+
+.portfolio-ai-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.portfolio-ai-head {
+  display: grid;
+  gap: 6px;
+}
+
+.portfolio-ai-head strong {
+  font-size: 1.08rem;
+}
+
+.portfolio-ai-head span {
+  color: rgba(242, 239, 232, 0.62);
+  line-height: 1.55;
+}
+
+.portfolio-ai-list {
+  display: grid;
+  gap: 14px;
+}
+
+.portfolio-ai-item {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.015)),
+    rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 20px;
+  padding: 18px;
+  display: grid;
+  gap: 10px;
+}
+
+.portfolio-ai-item-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.portfolio-ai-sidebadges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.portfolio-ai-item-head strong {
+  display: block;
+  font-size: 1.06rem;
+}
+
+.portfolio-ai-item-head strong span {
+  margin-left: 8px;
+  color: rgba(242, 239, 232, 0.5);
+  font-size: 0.84rem;
+  font-weight: 500;
+}
+
+.portfolio-ai-item-head small {
+  display: block;
+  margin-top: 6px;
+  color: #8db7ff;
+  font-size: 0.88rem;
+}
+
+.portfolio-ai-item p {
+  margin: 0;
+  color: rgba(242, 239, 232, 0.78);
+  line-height: 1.65;
+}
+
+.portfolio-ai-item p strong {
+  display: inline;
+  color: #f2efe8;
+}
+
+.portfolio-ai-confidence {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.3rem 0.72rem;
+  border-radius: 999px;
+  background: rgba(63, 133, 255, 0.14);
+  border: 1px solid rgba(99, 157, 255, 0.22);
+  color: #8db7ff;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.portfolio-ai-score,
+.portfolio-ai-meta span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.3rem 0.72rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.portfolio-ai-score {
+  background: rgba(238, 124, 56, 0.14);
+  border: 1px solid rgba(238, 124, 56, 0.2);
+  color: #ffcfad;
+}
+
+.portfolio-ai-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.portfolio-ai-meta span {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  color: rgba(242, 239, 232, 0.74);
+}
+
+.portfolio-ai-funding {
+  display: grid;
+  gap: 12px;
+}
+
+.portfolio-ai-funding-list {
+  display: grid;
+  gap: 12px;
+}
+
+.portfolio-ai-funding-item {
+  display: grid;
+  gap: 6px;
+  padding: 14px 0 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.portfolio-ai-funding-item:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.portfolio-ai-funding-item strong span {
+  margin-left: 8px;
+  color: rgba(242, 239, 232, 0.5);
+  font-size: 0.84rem;
+  font-weight: 500;
+}
+
+.portfolio-ai-funding-item small {
+  color: #8db7ff;
+}
+
 .headline-feed {
   display: flex;
   gap: 16px;
@@ -1865,6 +2068,14 @@ h2 {
 
   .stock-quote-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .portfolio-ai-roadmap {
+    grid-template-columns: 1fr;
+  }
+
+  .portfolio-ai-grid {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -2112,6 +2323,14 @@ h2 {
 
   .portfolio-profile-tab {
     min-width: 200px;
+  }
+
+  .portfolio-ai-item-head {
+    display: grid;
+  }
+
+  .portfolio-ai-sidebadges {
+    justify-content: flex-start;
   }
 
   .upload-inline-grid,

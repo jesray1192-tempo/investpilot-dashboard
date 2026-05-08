@@ -1,10 +1,12 @@
 import { ChangeEvent, DragEvent, FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
 import {
   dataSources,
+  fundFlowBoards,
   marketBreadth,
   marketEvents,
   portfolioProfiles,
-  riskSignals
+  riskSignals,
+  sectorBoards
 } from "./data/mock";
 import { fetchLiveLimitUpPool } from "./services/limitUpPool";
 import { fetchLiveMarketIndices } from "./services/marketIndices";
@@ -59,6 +61,45 @@ type UploadAsset = {
   name: string;
   kind: string;
   source: "file" | "link";
+};
+
+type HoldingAiAction = {
+  code: string;
+  name: string;
+  action: string;
+  confidence: string;
+  priority: string;
+  score: number;
+  positionAdvice: string;
+  executionRatio: string;
+  executionShares: string;
+  reason: string;
+  nextStep: string;
+  expectation: string;
+};
+
+type AiIdea = {
+  sector: string;
+  stock: string;
+  code: string;
+  reason: string;
+  expectation: string;
+};
+
+type PortfolioAiRoadmap = {
+  summary: string;
+  rebalance: string;
+  cashPlan: string;
+  focus: string;
+};
+
+type FundingPlan = {
+  source: string;
+  code: string;
+  action: string;
+  ratio: string;
+  shares: string;
+  reason: string;
 };
 
 function FieldValue({
@@ -445,6 +486,211 @@ function totalCostValue(items: Holding[]) {
   return items.reduce((sum, item) => sum + item.shares * item.cost, 0);
 }
 
+function parseExecutionRatioMidpoint(range: string) {
+  const matches = range.match(/(\d+(?:\.\d+)?)%/g) ?? [];
+
+  if (matches.length === 0) {
+    return 0;
+  }
+
+  const values = matches.map((item) => Number.parseFloat(item.replace("%", "")));
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function buildHoldingAiActions(items: Holding[]): HoldingAiAction[] {
+  return items.map((item) => {
+    const weight = item.weight ?? 0;
+    const pnlPercent = ((item.price - item.cost) / item.cost) * 100;
+    const targetGap = typeof item.targetPrice === "number" ? ((item.targetPrice - item.price) / item.price) * 100 : null;
+    const stopGap = typeof item.stopLoss === "number" ? ((item.price - item.stopLoss) / item.price) * 100 : null;
+    let score = 68;
+
+    let action = "继续持有";
+    let confidence = "中";
+    let priority = "中优先级";
+    let positionAdvice = "维持当前仓位";
+    let executionRatio = "0%";
+    let reason = "当前盈亏和波动处于可控区间，暂不需要激进调仓。";
+    let nextStep = "继续观察量价配合、板块资金承接和目标价兑现节奏。";
+    let expectation = "预期未来 1 到 3 周以震荡上行为主，适合边走边看。";
+
+    if (typeof item.stopLoss === "number" && item.price <= item.stopLoss * 1.03) {
+      action = "减仓或止损";
+      confidence = "高";
+      priority = "最高优先级";
+      positionAdvice = "快速降仓";
+      executionRatio = "50% - 100%";
+      score = 28;
+      reason = `现价已接近止损位，说明成本防守已经失效，再拖会放大回撤。`;
+      nextStep = "优先减掉一半以上仓位，若次日无法快速收回止损线，则执行清仓。";
+      expectation = "短期更可能先走弱，先保住资金效率比博反弹更重要。";
+    } else if (pnlPercent >= 18 && targetGap !== null && targetGap <= 6) {
+      action = "分批止盈";
+      confidence = "高";
+      priority = "高优先级";
+      positionAdvice = "兑现部分利润";
+      executionRatio = "20% - 30%";
+      score = 74;
+      reason = "已有较厚浮盈，且距离目标价不远，继续死扛的赔率开始下降。";
+      nextStep = "先兑现 20% 到 30% 仓位，把利润锁住，剩余仓位跟踪趋势。";
+      expectation = "后续仍可能有冲高，但更适合用移动止盈去吃尾段。";
+    } else if (pnlPercent < -8 && weight >= 20) {
+      action = "减仓观察";
+      confidence = "中高";
+      priority = "高优先级";
+      positionAdvice = "降到中性仓位";
+      executionRatio = "20% - 40%";
+      score = 42;
+      reason = "这类亏损幅度叠加较高仓位，会拖累组合修复速度。";
+      nextStep = "先把仓位降到组合中性水平，再等量能修复和板块回流确认。";
+      expectation = "若没有明显增量资金回流，短期修复弹性有限。";
+    } else if (item.dailyChange > 2.5 && pnlPercent > 0) {
+      action = "坚定持有";
+      confidence = "高";
+      priority = "中优先级";
+      positionAdvice = weight >= 25 ? "持有不追高" : "可小幅顺势加仓";
+      executionRatio = weight >= 25 ? "0%" : "5% - 10%";
+      score = 85;
+      reason = "价格、浮盈和当日强度同向，说明市场资金仍在强化这笔交易。";
+      nextStep = "不追高加仓，重点盯住量能是否继续放大，以及回撤是否守住 5 日节奏。";
+      expectation = "若板块热度延续，未来数日仍有继续上冲空间。";
+    } else if (targetGap !== null && targetGap > 12 && pnlPercent > -3) {
+      action = "持有待涨";
+      confidence = "中";
+      priority = "中优先级";
+      positionAdvice = "保留仓位等待趋势";
+      executionRatio = "0% - 10%";
+      score = 72;
+      reason = "离目标价仍有一段安全收益空间，现阶段更适合给趋势时间。";
+      nextStep = "围绕成本附近做防守，若出现放量突破可再小幅顺势加仓。";
+      expectation = "后续以趋势修复和估值回归为主，节奏不会特别快。";
+    }
+
+    if (weight >= 30 && action === "坚定持有") {
+      positionAdvice = "只持有不加仓";
+      executionRatio = "0%";
+      nextStep = "仓位已经偏重，不建议继续加码，重点做风控和利润保护。";
+    }
+
+    if (stopGap !== null && stopGap < 8 && action !== "减仓或止损") {
+      priority = "高优先级";
+      nextStep = `${nextStep} 同时把止损执行放在首位，避免小亏拖成大亏。`;
+    }
+
+    if (weight <= 12 && score >= 80) {
+      positionAdvice = "可试探性加仓";
+      executionRatio = "5% - 8%";
+    }
+
+    return {
+      code: item.code,
+      name: item.name,
+      action,
+      confidence,
+      priority,
+      score,
+      positionAdvice,
+      executionRatio,
+      executionShares:
+        parseExecutionRatioMidpoint(executionRatio) > 0
+          ? `${Math.max(100, Math.round((item.shares * parseExecutionRatioMidpoint(executionRatio)) / 100 / 100) * 100)} 股`
+          : "暂不调整",
+      reason,
+      nextStep,
+      expectation
+    };
+  }).sort((left, right) => left.score - right.score);
+}
+
+function buildAiIdeas(items: Holding[]): AiIdea[] {
+  const heldThemes = new Set(items.flatMap((item) => item.tags));
+  const preferredBoards = sectorBoards
+    .filter((board) => board.change > 0 && !heldThemes.has(board.name))
+    .slice(0, 2);
+  const flowBoards = fundFlowBoards.filter((board) => board.strength !== "weak").slice(0, 2);
+
+  const boardIdeas = preferredBoards.map((board) => ({
+    sector: board.name,
+    stock: board.stocks[0]?.name ?? board.leader,
+    code: board.stocks[0]?.code ?? "--",
+    reason: `${board.note} 当前板块涨幅 ${percent(board.change)}，具备资金继续抱团的基础。`,
+    expectation: `预期若主线延续，${board.stocks[0]?.name ?? board.leader} 更容易成为下一阶段的前排承接标的。`
+  }));
+
+  const flowIdeas = flowBoards.map((board) => ({
+    sector: board.name,
+    stock:
+      board.name === "证券"
+        ? "东方财富"
+        : board.name === "汽车零部件"
+          ? "沃尔核材"
+          : board.name === "消费电子"
+            ? "立讯精密"
+            : board.name,
+    code:
+      board.name === "证券"
+        ? "300059"
+        : board.name === "汽车零部件"
+          ? "002130"
+          : board.name === "消费电子"
+            ? "002475"
+            : "--",
+    reason: `${board.note} 资金流入方向清晰，适合做组合中新开仓的进攻补充。`,
+    expectation: `若市场成交额维持在 ${marketBreadth.turnover} 附近，该方向更容易拿到增量资金。`
+  }));
+
+  return [...boardIdeas, ...flowIdeas]
+    .filter(
+      (idea, index, array) =>
+        array.findIndex((candidate) => candidate.code === idea.code) === index
+    )
+    .slice(0, 3);
+}
+
+function buildPortfolioAiRoadmap(
+  items: Holding[],
+  actions: HoldingAiAction[],
+  cashEstimate: number
+): PortfolioAiRoadmap {
+  const highRiskCount = actions.filter((item) => item.score <= 45).length;
+  const positiveCount = actions.filter((item) => item.score >= 75).length;
+  const averageScore =
+    actions.length > 0 ? actions.reduce((sum, item) => sum + item.score, 0) / actions.length : 0;
+  const heavyWeights = items.filter((item) => (item.weight ?? 0) >= 25).length;
+
+  return {
+    summary:
+      highRiskCount > 0
+        ? `组合里有 ${highRiskCount} 只个股需要优先处理，当前核心任务不是加仓，而是先把低分仓位降下来。`
+        : positiveCount >= 2
+          ? "组合整体进攻性尚可，可以在不破坏纪律的前提下保留主线仓位。"
+          : "组合处于中性偏谨慎状态，适合边持有边优化结构。",
+    rebalance:
+      heavyWeights >= 2
+        ? "先把高波动和大仓位品种错开，避免单一风格回撤同时打击组合。"
+        : "优先保留评分更高、资金趋势更顺的持仓，把弱势票压缩到观察仓。",
+    cashPlan:
+      cashEstimate < totalMarketValue(items) * 0.35
+        ? "新增仓位资金建议优先来自减仓弱势股，而不是直接继续加总仓。"
+        : "当前现金缓冲尚可，新仓位可以先试探性布局，再看资金承接决定是否扩仓。",
+    focus: `当前组合平均评分 ${averageScore.toFixed(0)} 分，后续重点盯量能延续、止损执行和板块资金是否继续向强势方向集中。`
+  };
+}
+
+function buildFundingPlans(actions: HoldingAiAction[]): FundingPlan[] {
+  return actions
+    .filter((item) => item.score <= 60 && item.executionShares !== "暂不调整")
+    .slice(0, 2)
+    .map((item) => ({
+      source: item.name,
+      code: item.code,
+      action: item.action,
+      ratio: item.executionRatio,
+      shares: item.executionShares,
+      reason: `这只股票当前评分偏低，适合作为新开仓资金的主要来源，先腾出 ${item.executionRatio} 的弹性更合理。`
+    }));
+}
+
 function PlaceholderSection({
   title,
   summary,
@@ -590,6 +836,13 @@ export default function App() {
   const pnl = marketValue - costValue;
   const pnlPercent = (pnl / costValue) * 100;
   const isEditablePortfolio = activePortfolioProfile?.id === "mine";
+  const holdingAiActions = useMemo(() => buildHoldingAiActions(portfolio), [portfolio]);
+  const aiIdeas = useMemo(() => buildAiIdeas(portfolio), [portfolio]);
+  const portfolioAiRoadmap = useMemo(
+    () => buildPortfolioAiRoadmap(portfolio, holdingAiActions, activePortfolioCashEstimate),
+    [activePortfolioCashEstimate, holdingAiActions, portfolio]
+  );
+  const fundingPlans = useMemo(() => buildFundingPlans(holdingAiActions), [holdingAiActions]);
 
   useEffect(() => {
     if (portfolioProfilesState.some((profile) => profile.id === activePortfolioProfileId)) {
@@ -2623,6 +2876,115 @@ export default function App() {
                     ))}
                   </div>
                 )}
+              </article>
+
+              <article className="card full-span">
+                <div className="card-head">
+                  <div>
+                    <p className="section-kicker">AI Portfolio Coach</p>
+                    <h2>AI持仓建议</h2>
+                  </div>
+                </div>
+                <section className="portfolio-ai-roadmap">
+                  <div className="portfolio-ai-roadmap-item">
+                    <span>组合路线</span>
+                    <strong>{portfolioAiRoadmap.summary}</strong>
+                    <p>{portfolioAiRoadmap.rebalance}</p>
+                  </div>
+                  <div className="portfolio-ai-roadmap-item">
+                    <span>资金安排</span>
+                    <strong>{portfolioAiRoadmap.cashPlan}</strong>
+                    <p>{portfolioAiRoadmap.focus}</p>
+                  </div>
+                </section>
+                <div className="portfolio-ai-grid">
+                  <section className="portfolio-ai-panel">
+                    <div className="portfolio-ai-head">
+                      <strong>逐股操作建议</strong>
+                      <span>结合成本、浮盈亏、仓位暴露、止损距离和当日强弱给出下一步动作。</span>
+                    </div>
+                    <div className="portfolio-ai-list">
+                      {holdingAiActions.map((item) => (
+                        <article className="portfolio-ai-item" key={item.code}>
+                          <div className="portfolio-ai-item-head">
+                            <div>
+                              <strong>
+                                {item.name}
+                                <span>{item.code}</span>
+                              </strong>
+                              <small>{item.action}</small>
+                            </div>
+                            <div className="portfolio-ai-sidebadges">
+                              <span className="portfolio-ai-score">{item.score}分</span>
+                              <span className="portfolio-ai-confidence">{item.confidence}置信度</span>
+                            </div>
+                          </div>
+                          <div className="portfolio-ai-meta">
+                            <span>{item.priority}</span>
+                            <span>{item.positionAdvice}</span>
+                            <span>建议动作比例 {item.executionRatio}</span>
+                            <span>约 {item.executionShares}</span>
+                          </div>
+                          <p>{item.reason}</p>
+                          <p>
+                            <strong>下一步：</strong>
+                            {item.nextStep}
+                          </p>
+                          <p>
+                            <strong>预期：</strong>
+                            {item.expectation}
+                          </p>
+                        </article>
+                      ))}
+                    </div>
+                  </section>
+
+                  <section className="portfolio-ai-panel">
+                    <div className="portfolio-ai-head">
+                      <strong>可新入方向</strong>
+                      <span>基于当前组合缺口、板块强度和资金趋势，给出更值得新开仓的行业与个股。</span>
+                    </div>
+                    {fundingPlans.length > 0 && (
+                      <div className="portfolio-ai-funding">
+                        <strong>建议从以下持仓腾挪新仓资金</strong>
+                        <div className="portfolio-ai-funding-list">
+                          {fundingPlans.map((plan) => (
+                            <article className="portfolio-ai-funding-item" key={`${plan.code}-${plan.ratio}`}>
+                              <strong>
+                                {plan.source}
+                                <span>{plan.code}</span>
+                              </strong>
+                              <small>
+                                {plan.action} · {plan.ratio} · 约 {plan.shares}
+                              </small>
+                              <p>{plan.reason}</p>
+                            </article>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    <div className="portfolio-ai-list">
+                      {aiIdeas.map((idea) => (
+                        <article className="portfolio-ai-item" key={`${idea.code}-${idea.sector}`}>
+                          <div className="portfolio-ai-item-head">
+                            <div>
+                              <strong>
+                                {idea.stock}
+                                <span>{idea.code}</span>
+                              </strong>
+                              <small>{idea.sector}</small>
+                            </div>
+                          </div>
+                          <p>{idea.reason}</p>
+                          <p>
+                            <strong>预期：</strong>
+                            {idea.expectation}
+                          </p>
+                        </article>
+                      ))}
+                    </div>
+                  </section>
+                </div>
               </article>
 
               <article className="card full-span">
