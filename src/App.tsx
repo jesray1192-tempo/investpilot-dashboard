@@ -1,4 +1,4 @@
-import { ChangeEvent, DragEvent, FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, ClipboardEvent, DragEvent, FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
 import {
   dataSources,
   fundFlowBoards,
@@ -57,9 +57,13 @@ type HoldingFormState = {
 };
 
 type UploadAsset = {
+  id: string;
   name: string;
   kind: string;
-  source: "file" | "link";
+  source: "file" | "link" | "paste";
+  fileBlob?: Blob;
+  linkUrl?: string;
+  objectUrl?: string;
 };
 
 type HoldingAiAction = {
@@ -99,6 +103,14 @@ type FundingPlan = {
   ratio: string;
   shares: string;
   reason: string;
+};
+
+type MultimodalOutput = {
+  summary: string;
+  segmentSummaries: string[];
+  finalAnalysis: string;
+  strategy: string;
+  risk: string;
 };
 
 function FieldValue({
@@ -228,6 +240,17 @@ interface NavItem {
   description: string;
 }
 
+interface SiteStructureItem {
+  title: string;
+  role: string;
+  summary: string;
+}
+
+interface AiWorkflowStep {
+  title: string;
+  detail: string;
+}
+
 function parseAppHash(hash: string): {
   nav: NavKey;
   homeSubpage: HomeSubpageKey;
@@ -285,6 +308,63 @@ const navItems: NavItem[] = [
   { key: "funds", label: "基金", icon: "◉", description: "基金池、回撤与风格暴露" },
   { key: "hk", label: "港股", icon: "△", description: "港股通、恒指与主题股" },
   { key: "us", label: "美股", icon: "◇", description: "纳指、标普与中概跟踪" }
+];
+
+const siteStructure: SiteStructureItem[] = [
+  {
+    title: "首页",
+    role: "看市场",
+    summary: "聚合指数、涨停池、板块强弱、事件快讯和数据来源状态，先回答今天市场在交易什么。"
+  },
+  {
+    title: "我的持仓",
+    role: "管账户",
+    summary: "记录股票、交易、仓位、盈亏、纪律和组合风险，形成你的个人交易操作台。"
+  },
+  {
+    title: "AI分析",
+    role: "解内容",
+    summary: "统一接收视频、图片、文件和链接，先做文字总结，再输出分段结论和最终分析。"
+  },
+  {
+    title: "政策分析",
+    role: "看催化",
+    summary: "跟踪政策、新闻联播、国际局势和行业信号，梳理主题催化与验证路径。"
+  },
+  {
+    title: "基金",
+    role: "看风格",
+    summary: "放基金池、ETF 看板、风格轮动和回撤统计，判断当前市场偏价值、成长还是主题。"
+  },
+  {
+    title: "港股",
+    role: "看南向",
+    summary: "跟踪恒指、港股通、互联网、高股息和创新药，补上 A 股之外的重要映射市场。"
+  },
+  {
+    title: "美股",
+    role: "看海外",
+    summary: "聚焦纳指、标普、AI 主线、中概和利率预期，观察海外风险偏好如何反馈到本地市场。"
+  }
+];
+
+const aiWorkflowSteps: AiWorkflowStep[] = [
+  {
+    title: "1. 收集材料",
+    detail: "统一接收视频、图片、文件、网页链接和手动备注，不再把输入源拆成多个页面。"
+  },
+  {
+    title: "2. 内容拆解",
+    detail: "对长视频和长文档先做分段、分主题和关键信息抽取，先保留事实，再进入判断。"
+  },
+  {
+    title: "3. 生成总结",
+    detail: "先输出简明文字总结和分段摘要，让你快速确认材料到底讲了什么。"
+  },
+  {
+    title: "4. 输出分析",
+    detail: "最后形成投资分析、策略建议和风险提醒，把内容解读变成可执行动作。"
+  }
 ];
 
 const policyLinks = [
@@ -431,6 +511,77 @@ const emptyHoldingForm: HoldingFormState = {
 
 const portfolioProfilesStorageKey = "investpilot-portfolio-profiles";
 const activePortfolioProfileStorageKey = "investpilot-active-portfolio-profile";
+const uploadAssetsDbName = "investpilot-upload-assets";
+const uploadAssetsStoreName = "assets";
+
+function createUploadAssetId() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+
+  return `asset-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function openUploadAssetsDb() {
+  return new Promise<IDBDatabase>((resolve, reject) => {
+    const request = window.indexedDB.open(uploadAssetsDbName, 1);
+
+    request.onupgradeneeded = () => {
+      const database = request.result;
+      if (!database.objectStoreNames.contains(uploadAssetsStoreName)) {
+        database.createObjectStore(uploadAssetsStoreName, { keyPath: "id" });
+      }
+    };
+
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error ?? new Error("打开上传资产数据库失败"));
+  });
+}
+
+function loadPersistedUploadAssets() {
+  return new Promise<UploadAsset[]>(async (resolve, reject) => {
+    try {
+      const database = await openUploadAssetsDb();
+      const transaction = database.transaction(uploadAssetsStoreName, "readonly");
+      const store = transaction.objectStore(uploadAssetsStoreName);
+      const request = store.getAll();
+
+      request.onsuccess = () => {
+        const records = (request.result as UploadAsset[]).map((asset) => ({
+          ...asset,
+          objectUrl: asset.fileBlob ? URL.createObjectURL(asset.fileBlob) : undefined
+        }));
+        resolve(records);
+      };
+      request.onerror = () => reject(request.error ?? new Error("读取上传资产失败"));
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
+
+function persistUploadAssets(assets: UploadAsset[]) {
+  return new Promise<void>(async (resolve, reject) => {
+    try {
+      const database = await openUploadAssetsDb();
+      const transaction = database.transaction(uploadAssetsStoreName, "readwrite");
+      const store = transaction.objectStore(uploadAssetsStoreName);
+      const clearRequest = store.clear();
+
+      clearRequest.onerror = () => reject(clearRequest.error ?? new Error("清空上传资产失败"));
+      clearRequest.onsuccess = () => {
+        assets.forEach(({ objectUrl: _objectUrl, ...asset }) => {
+          store.put(asset);
+        });
+      };
+
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error ?? new Error("保存上传资产失败"));
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
 
 function clonePortfolioProfiles(profiles: PortfolioProfile[]) {
   return profiles.map((profile) => ({
@@ -526,6 +677,38 @@ function parseExecutionRatioMidpoint(range: string) {
 
   const values = matches.map((item) => Number.parseFloat(item.replace("%", "")));
   return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function buildUploadAssetFromFile(file: File, source: UploadAsset["source"] = "file"): UploadAsset {
+  const extension = file.name.includes(".")
+    ? file.name.slice(file.name.lastIndexOf("."))
+    : file.type === "image/png"
+      ? ".png"
+      : file.type === "image/jpeg"
+        ? ".jpg"
+        : "";
+  const generatedName =
+    source === "paste"
+      ? `粘贴图片 ${new Intl.DateTimeFormat("zh-CN", {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: false
+        }).format(new Date())}${extension}`
+      : file.name;
+
+  return {
+    id: createUploadAssetId(),
+    name: generatedName,
+    kind: file.type.startsWith("image/")
+      ? "图片"
+      : file.type.startsWith("video/")
+        ? "视频"
+        : "文件",
+    source,
+    fileBlob: file,
+    objectUrl: URL.createObjectURL(file)
+  };
 }
 
 function buildHoldingAiActions(items: Holding[]): HoldingAiAction[] {
@@ -775,18 +958,31 @@ function buildMultimodalOutput(
   linkValue: string,
   noteValue: string,
   runCount: number
-) {
+): MultimodalOutput {
   const focus = noteValue.trim() || "市场主线与潜在催化";
+  const videoAssets = assets.filter((asset) => asset.kind === "视频" || asset.kind === "视频链接");
   const sourceText =
     assets.length > 0
-      ? `已导入 ${assets.length} 份材料，重点围绕 ${assets.map((asset) => asset.kind).join("、")}`
+      ? `已导入 ${assets.length} 份材料，覆盖 ${assets.map((asset) => asset.kind).join("、")}`
       : "当前以链接与文字补充为主";
   const linkText = linkValue.trim() || "未填写外部链接";
   const stageText = runCount > 0 ? "已完成一轮初步解读" : "等待开始分析";
+  const segmentSummaries =
+    videoAssets.length > 0
+      ? [
+          `片段一：视频前段主要在交代背景和问题定义，核心线索先落在“${focus}”相关的行业催化与市场预期上。`,
+          `片段二：视频中段更适合由 AI 自动分段抽取关键观点，重点看哪些表述对应真实订单、政策推进或资金共识，而不是情绪噪音。`,
+          `片段三：视频后段应重点归纳验证条件、时间窗口和风险点，避免只记住观点而忽略兑现路径。`
+        ]
+      : [
+          `材料总结：当前材料核心集中在“${focus}”，更适合先提炼事实、观点和潜在催化的边界。`,
+          `交叉验证：链接与截图内容需要和公告、官方口径或行业数据互相印证，避免单点信息误导。`
+        ];
 
   return {
-    traits: `${stageText}。${sourceText}，AI 当前识别的核心关注点是“${focus}”，并把材料聚焦到政策信号、产业景气和情绪驱动三个层面。`,
-    analysis: `从内容结构看，链接来源为 ${linkText}。若材料来自视频或截图，AI 会更偏重识别表述语气、重复关键词和可能被市场放大的片段，再结合你的补充说明做二次归因。`,
+    summary: `${stageText}。${sourceText}。${videoAssets.length > 0 ? "上传的视频将按内容片段自动拆解总结，不限制时长。" : ""} 当前文字总结优先提炼事实信息、关键观点和可验证的催化线索。`,
+    segmentSummaries,
+    finalAnalysis: `从内容结构看，链接来源为 ${linkText}。若材料来自长视频，AI 更适合先做分段提炼，再把重复出现的关键词、语气变化和结论依据压缩成可执行观察点，最后再结合你的补充说明做二次归因。`,
     strategy: `策略上建议先把材料拆成“直接受益”“间接受益”“情绪映射”三类，再优先跟踪最容易形成资金共识的行业龙头与弹性标的。对于尚未证实的结论，宜放入观察清单而不是直接重仓。`,
     risk: `风险主要在信息截取不完整、视频观点带宣传色彩、文章立场先行以及截图缺少上下文。若单一材料无法和官方数据、公告或行业事实交叉验证，应降低置信度。`
   };
@@ -802,10 +998,8 @@ export default function App() {
   const [activePortfolioTab, setActivePortfolioTab] = useState<PortfolioTabKey>("holdings");
   const [aiLinkInput, setAiLinkInput] = useState("");
   const [aiNoteInput, setAiNoteInput] = useState("重点判断材料里的产业催化是否能转化为真实投资主线。");
-  const [uploadAssets, setUploadAssets] = useState<UploadAsset[]>([
-    { name: "路演纪要截图.png", kind: "图片", source: "file" },
-    { name: "政策解读视频链接", kind: "视频链接", source: "link" }
-  ]);
+  const [uploadAssets, setUploadAssets] = useState<UploadAsset[]>([]);
+  const [uploadAssetsReady, setUploadAssetsReady] = useState(false);
   const [analysisRuns, setAnalysisRuns] = useState(1);
   const [policyUrl, setPolicyUrl] = useState("https://www.gov.cn/yaowen/liebiao/202505/content_7024210.htm");
   const [policyTheme, setPolicyTheme] = useState("十五五规划");
@@ -1155,6 +1349,42 @@ export default function App() {
     () => buildMultimodalOutput(uploadAssets, aiLinkInput, aiNoteInput, analysisRuns),
     [uploadAssets, aiLinkInput, aiNoteInput, analysisRuns]
   );
+  const uploadedVideos = useMemo(
+    () => uploadAssets.filter((asset) => asset.kind === "视频" && asset.objectUrl),
+    [uploadAssets]
+  );
+  const aiMaterialSummary = useMemo(() => {
+    const videos = uploadAssets.filter((asset) => asset.kind === "视频" || asset.kind === "视频链接").length;
+    const images = uploadAssets.filter((asset) => asset.kind === "图片").length;
+    const documents = uploadAssets.filter((asset) => asset.kind === "文件" || asset.kind === "文章链接").length;
+
+    return {
+      total: uploadAssets.length,
+      videos,
+      images,
+      documents
+    };
+  }, [uploadAssets]);
+  const aiActionBoard = useMemo(
+    () => [
+      {
+        title: "当前输入重点",
+        detail: aiNoteInput.trim() || "先补充你最关心的变量，例如行业催化、情绪传导或业绩兑现。"
+      },
+      {
+        title: "下一步操作",
+        detail:
+          uploadAssets.length > 0
+            ? "先确认文字总结和分段摘要是否准确，再决定要不要继续追问某个片段。"
+            : "先把材料放进来，再让 AI 做第一轮内容拆解和结论归纳。"
+      },
+      {
+        title: "结果用途",
+        detail: "把最终分析沉淀成观察清单、交易假设和验证条件，而不是直接替代交易决策。"
+      }
+    ],
+    [aiNoteInput, uploadAssets.length]
+  );
   const portfolioCodes = useMemo(() => portfolio.map((item) => item.code), [portfolio]);
   const portfolioCodeSignature = useMemo(
     () => [...portfolioCodes].sort((left, right) => left.localeCompare(right, "zh-CN")).join(","),
@@ -1299,6 +1529,41 @@ export default function App() {
       activePortfolioProfileId
     );
   }, [activePortfolioProfileId]);
+
+  useEffect(() => {
+    let disposed = false;
+
+    const loadAssets = async () => {
+      try {
+        const assets = await loadPersistedUploadAssets();
+        if (!disposed) {
+          setUploadAssets(assets);
+        }
+      } catch {
+        if (!disposed) {
+          setUploadAssets([]);
+        }
+      } finally {
+        if (!disposed) {
+          setUploadAssetsReady(true);
+        }
+      }
+    };
+
+    void loadAssets();
+
+    return () => {
+      disposed = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!uploadAssetsReady) {
+      return;
+    }
+
+    void persistUploadAssets(uploadAssets);
+  }, [uploadAssets, uploadAssetsReady]);
 
   useEffect(() => {
     if (!isHoldingEditorOpen) {
@@ -1675,17 +1940,7 @@ export default function App() {
       return;
     }
 
-    mergeAssets(
-      files.map((file) => ({
-        name: file.name,
-        kind: file.type.startsWith("image/")
-          ? "图片"
-          : file.type.startsWith("video/")
-            ? "视频"
-            : "文件",
-        source: "file" as const
-      }))
-    );
+    mergeAssets(files.map((file) => buildUploadAssetFromFile(file)));
     event.target.value = "";
   }
 
@@ -1696,17 +1951,20 @@ export default function App() {
       return;
     }
 
-    mergeAssets(
-      files.map((file) => ({
-        name: file.name,
-        kind: file.type.startsWith("image/")
-          ? "图片"
-          : file.type.startsWith("video/")
-            ? "视频"
-            : "文件",
-        source: "file" as const
-      }))
-    );
+    mergeAssets(files.map((file) => buildUploadAssetFromFile(file)));
+  }
+
+  function handleUploadPaste(event: ClipboardEvent<HTMLDivElement>) {
+    const clipboardFiles = Array.from(event.clipboardData.items ?? [])
+      .map((item) => item.getAsFile())
+      .filter((file): file is File => file !== null);
+
+    if (clipboardFiles.length === 0) {
+      return;
+    }
+
+    event.preventDefault();
+    mergeAssets(clipboardFiles.map((file) => buildUploadAssetFromFile(file, "paste")));
   }
 
   function handleAddLinkAsset() {
@@ -1718,11 +1976,14 @@ export default function App() {
     setUploadAssets((current) => [
       ...current,
       {
+        id: createUploadAssetId(),
         name: trimmedLink,
         kind: trimmedLink.includes("video") || trimmedLink.includes("bilibili") ? "视频链接" : "文章链接",
-        source: "link"
+        source: "link",
+        linkUrl: trimmedLink
       }
     ]);
+    setAiLinkInput("");
   }
 
   function handleAnalyze() {
@@ -2103,6 +2364,27 @@ export default function App() {
             </section>
 
             <section className="dashboard-grid">
+              <article className="card full-span">
+                <div className="card-head">
+                  <div>
+                    <p className="section-kicker">Structure</p>
+                    <h2>网站结构</h2>
+                  </div>
+                </div>
+                <p className="placeholder-summary">
+                  这一版先把产品骨架定清楚。首页负责看市场，我的持仓负责管账户，AI 分析负责解读材料，政策/基金/港股/美股负责补足不同维度的决策上下文。
+                </p>
+                <div className="placeholder-grid">
+                  {siteStructure.map((item) => (
+                    <div className="placeholder-card" key={item.title}>
+                      <span className="structure-role">{item.role}</span>
+                      <strong>{item.title}</strong>
+                      <p>{item.summary}</p>
+                    </div>
+                  ))}
+                </div>
+              </article>
+
               <article className="card source-card">
                 <div className="card-head">
                   <div>
@@ -3050,96 +3332,217 @@ export default function App() {
         {activeNav === "ai" && (
           <section className="placeholder-view">
             <article className="card wide">
+              <div className="card-head">
+                <div>
+                  <p className="section-kicker">Workspace</p>
+                  <h1>AI分析工作台</h1>
+                </div>
+              </div>
+              <p className="placeholder-summary">
+                这一页先按完整工作流来搭结构：先收材料，再做拆解，然后输出总结与分析，最后沉淀成可执行结论。后面我们再继续把真实模型、转写和分段能力逐步接进来。
+              </p>
+
+              <div className="ai-overview-grid">
+                <div className="placeholder-card">
+                  <span className="structure-role">输入</span>
+                  <strong>{aiMaterialSummary.total} 份材料</strong>
+                  <p>当前工作台里已经导入的视频、图片、文件和链接总数。</p>
+                </div>
+                <div className="placeholder-card">
+                  <span className="structure-role">视频</span>
+                  <strong>{aiMaterialSummary.videos} 段</strong>
+                  <p>长视频不限制时长，默认按后续分段处理的结构来设计。</p>
+                </div>
+                <div className="placeholder-card">
+                  <span className="structure-role">图片</span>
+                  <strong>{aiMaterialSummary.images} 张</strong>
+                  <p>支持直接贴图、上传截图和从材料中补充局部上下文。</p>
+                </div>
+                <div className="placeholder-card">
+                  <span className="structure-role">结果</span>
+                  <strong>{analysisRuns} 轮</strong>
+                  <p>每轮分析都按“文字总结 → 分段摘要 → 最终分析”输出。</p>
+                </div>
+              </div>
+
+              <section className="ai-structure-section">
+                <div className="card-head">
+                  <div>
+                    <p className="section-kicker">Flow</p>
+                    <h2>分析流程</h2>
+                  </div>
+                </div>
+                <div className="placeholder-grid">
+                  {aiWorkflowSteps.map((step) => (
+                    <div className="placeholder-card" key={step.title}>
+                      <strong>{step.title}</strong>
+                      <p>{step.detail}</p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
               <section className="multimodal-layout">
                 <div className="upload-panel">
+                  <div className="card-head compact-head">
+                    <div>
+                      <p className="section-kicker">Input</p>
+                      <h2>材料工作台</h2>
+                    </div>
+                  </div>
                   <div
-                    className="upload-dropzone"
-                    onDragOver={(event) => event.preventDefault()}
-                    onDrop={handleUploadDrop}
+                    className="upload-composer-card"
+                    onPaste={handleUploadPaste}
+                    tabIndex={0}
                   >
-                    <strong>上传视频 / 图片 / 文件</strong>
-                    <p>支持视频、截图、研报 PDF、会议纪要、政策文件、财报和各类文档。</p>
-                    <div className="upload-actions">
-                      <label className="upload-trigger">
-                        选择本地文件
-                        <input
-                          className="hidden-file-input"
-                          type="file"
-                          multiple
-                          onChange={handleFileSelection}
-                        />
-                      </label>
-                      <span className="upload-hint">也可以直接拖拽文件到这里</span>
-                    </div>
-                  </div>
-
-                  <div className="upload-inline-grid">
-                    <div className="upload-input-card">
-                      <strong>视频地址 / 文章地址</strong>
-                      <input
-                        className="real-input"
-                        value={aiLinkInput}
-                        onChange={(event) => setAiLinkInput(event.target.value)}
-                        placeholder="粘贴视频链接、文章链接、网页地址"
-                      />
-                    </div>
-                    <div className="upload-input-card">
-                      <strong>截图补充说明</strong>
-                      <textarea
-                        className="real-textarea compact-textarea"
-                        value={aiNoteInput}
-                        onChange={(event) => setAiNoteInput(event.target.value)}
-                        placeholder="补充截图来源、时间、上下文和你的关注点"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="upload-toolbar">
-                    <button type="button" className="secondary action-btn" onClick={handleAddLinkAsset}>
-                      添加链接到材料列表
-                    </button>
-                    <button type="button" className="action-btn" onClick={handleAnalyze}>
-                      开始分析
-                    </button>
-                  </div>
-
-                  <div className="material-list-card">
-                    <div className="card-head compact-head">
-                      <div>
-                        <p className="section-kicker">Assets</p>
-                        <h2>已导入文件列表</h2>
+                    <div
+                      className="upload-dropzone"
+                      onDragOver={(event) => event.preventDefault()}
+                      onDrop={handleUploadDrop}
+                    >
+                      <strong>上传视频 / 图片 / 文件</strong>
+                      <p>支持视频、截图、研报 PDF、会议纪要、政策文件、财报和各类文档。视频时长不做限制，AI 会按内容自动分段总结。</p>
+                      <div className="upload-actions">
+                        <label className="upload-trigger">
+                          选择本地文件
+                          <input
+                            className="hidden-file-input"
+                            type="file"
+                            multiple
+                            onChange={handleFileSelection}
+                          />
+                        </label>
+                        <span className="upload-hint">也可以直接拖拽文件到这里，或在这个模块里粘贴截图</span>
                       </div>
                     </div>
-                    <div className="material-list">
-                      {uploadAssets.map((asset, index) => (
-                        <div className="material-item" key={`${asset.name}-${index}`}>
-                          <strong>{asset.name}</strong>
-                          <span>
-                            {asset.kind} · {asset.source === "file" ? "本地文件" : "外部链接"}
-                          </span>
-                        </div>
-                      ))}
+
+                    <div className="upload-inline-grid">
+                      <div className="upload-input-card">
+                        <strong>视频地址 / 文章地址</strong>
+                        <input
+                          className="real-input"
+                          value={aiLinkInput}
+                          onChange={(event) => setAiLinkInput(event.target.value)}
+                          placeholder="粘贴视频链接、文章链接、网页地址"
+                        />
+                      </div>
+                      <div className="upload-input-card">
+                        <strong>截图补充说明</strong>
+                        <textarea
+                          className="real-textarea compact-textarea"
+                          value={aiNoteInput}
+                          onChange={(event) => setAiNoteInput(event.target.value)}
+                          placeholder="补充截图来源、时间、上下文和你的关注点"
+                        />
+                      </div>
                     </div>
+
+                    <div className="upload-toolbar">
+                      <button type="button" className="secondary action-btn" onClick={handleAddLinkAsset}>
+                        添加链接到材料列表
+                      </button>
+                      <button type="button" className="action-btn" onClick={handleAnalyze}>
+                        开始分析
+                      </button>
+                    </div>
+
+                    <div className="material-list-card">
+                      <div className="card-head compact-head">
+                        <div>
+                          <p className="section-kicker">Assets</p>
+                          <h2>已导入文件列表</h2>
+                        </div>
+                      </div>
+                      <div className="material-list">
+                        {uploadAssets.map((asset, index) => (
+                          <div className="material-item" key={`${asset.name}-${index}`}>
+                            <strong>{asset.name}</strong>
+                            <span>
+                              {asset.kind} ·{" "}
+                              {asset.source === "link"
+                                ? "外部链接"
+                                : asset.source === "paste"
+                                  ? "粘贴图片"
+                                  : "本地文件"}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {uploadedVideos.length > 0 && (
+                      <div className="saved-video-card">
+                        <div className="card-head compact-head">
+                          <div>
+                            <p className="section-kicker">Saved Videos</p>
+                            <h2>已保存视频</h2>
+                          </div>
+                        </div>
+                        <div className="saved-video-list">
+                          {uploadedVideos.map((asset) => (
+                            <article className="saved-video-item" key={asset.id}>
+                              <strong>{asset.name}</strong>
+                              <video className="saved-video-player" controls preload="metadata" src={asset.objectUrl} />
+                            </article>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                <div className="generated-grid">
-                  <div className="placeholder-card">
-                    <strong>AI 识别特点</strong>
-                    <p>{multimodalOutput.traits}</p>
+                <div className="analysis-flow">
+                  <div className="card-head compact-head">
+                    <div>
+                      <p className="section-kicker">Output</p>
+                      <h2>结果输出</h2>
+                    </div>
                   </div>
-                  <div className="placeholder-card">
-                    <strong>AI 深度分析</strong>
-                    <p>{multimodalOutput.analysis}</p>
+                  <div className="placeholder-card analysis-summary-card">
+                    <strong>文字总结</strong>
+                    <p>{multimodalOutput.summary}</p>
                   </div>
-                  <div className="placeholder-card">
-                    <strong>投资策略</strong>
-                    <p>{multimodalOutput.strategy}</p>
+
+                  <div className="generated-grid">
+                    {multimodalOutput.segmentSummaries.map((segment, index) => (
+                      <div className="placeholder-card" key={`segment-${index}`}>
+                        <strong>{`分段总结 ${index + 1}`}</strong>
+                        <p>{segment}</p>
+                      </div>
+                    ))}
                   </div>
-                  <div className="placeholder-card">
-                    <strong>风险与偏差提醒</strong>
-                    <p>{multimodalOutput.risk}</p>
+
+                  <div className="analysis-final-grid">
+                    <div className="placeholder-card analysis-final-card">
+                      <strong>AI 最终分析</strong>
+                      <p>{multimodalOutput.finalAnalysis}</p>
+                    </div>
+                    <div className="placeholder-card">
+                      <strong>投资策略</strong>
+                      <p>{multimodalOutput.strategy}</p>
+                    </div>
+                    <div className="placeholder-card">
+                      <strong>风险与偏差提醒</strong>
+                      <p>{multimodalOutput.risk}</p>
+                    </div>
                   </div>
+
+                  <section className="ai-structure-section">
+                    <div className="card-head compact-head">
+                      <div>
+                        <p className="section-kicker">Action Board</p>
+                        <h2>行动板</h2>
+                      </div>
+                    </div>
+                    <div className="placeholder-grid">
+                      {aiActionBoard.map((item) => (
+                        <div className="placeholder-card" key={item.title}>
+                          <strong>{item.title}</strong>
+                          <p>{item.detail}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
                 </div>
               </section>
             </article>
