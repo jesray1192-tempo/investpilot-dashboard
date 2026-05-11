@@ -27,7 +27,6 @@ type NavKey =
   | "hk"
   | "us";
 
-type AiTabKey = "multimodal" | "strategy";
 type MarketTabKey = "limitup" | "heat" | "turnover";
 type PortfolioTabKey = "holdings" | "trades";
 type HomeSubpageKey = "overview" | "events" | "boards" | "stock";
@@ -281,7 +280,7 @@ function parseAppHash(hash: string): {
 const navItems: NavItem[] = [
   { key: "home", label: "首页", icon: "◎", description: "指数、板块与市场行情" },
   { key: "portfolio", label: "我的持仓", icon: "▣", description: "股票仓位与盈亏跟踪" },
-  { key: "ai", label: "AI分析", icon: "✦", description: "策略诊断与风控建议" },
+  { key: "ai", label: "AI分析", icon: "✦", description: "多模态内容分析" },
   { key: "policy", label: "政策分析", icon: "◫", description: "政策、行业与主题催化" },
   { key: "funds", label: "基金", icon: "◉", description: "基金池、回撤与风格暴露" },
   { key: "hk", label: "港股", icon: "△", description: "港股通、恒指与主题股" },
@@ -346,6 +345,26 @@ function currencyWithPrecision(value: number, digits: number) {
 
 function percent(value: number) {
   return `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
+}
+
+function formatPositionPercent(value: number) {
+  if (!Number.isFinite(value) || value <= 0) {
+    return "0%";
+  }
+
+  if (value < 0.01) {
+    return "<0.01%";
+  }
+
+  if (value < 1) {
+    return `${value.toFixed(2)}%`;
+  }
+
+  if (value < 10) {
+    return `${value.toFixed(1)}%`;
+  }
+
+  return `${Math.round(value)}%`;
 }
 
 function formatLargeYi(value: number, suffix = "亿") {
@@ -479,11 +498,23 @@ function holdingToFormState(item: Holding): HoldingFormState {
 }
 
 function totalMarketValue(items: Holding[]) {
-  return items.reduce((sum, item) => sum + item.shares * item.price, 0);
+  return items.reduce((sum, item) => sum + holdingMarketValue(item), 0);
 }
 
 function totalCostValue(items: Holding[]) {
   return items.reduce((sum, item) => sum + item.shares * item.cost, 0);
+}
+
+function holdingMarketValue(item: Holding) {
+  return item.shares * item.price;
+}
+
+function holdingWeightPercent(item: Holding, portfolioMarketValue: number) {
+  if (portfolioMarketValue <= 0) {
+    return item.weight ?? 0;
+  }
+
+  return (holdingMarketValue(item) / portfolioMarketValue) * 100;
 }
 
 function parseExecutionRatioMidpoint(range: string) {
@@ -498,8 +529,10 @@ function parseExecutionRatioMidpoint(range: string) {
 }
 
 function buildHoldingAiActions(items: Holding[]): HoldingAiAction[] {
+  const portfolioMarketValue = totalMarketValue(items);
+
   return items.map((item) => {
-    const weight = item.weight ?? 0;
+    const weight = holdingWeightPercent(item, portfolioMarketValue);
     const pnlPercent = ((item.price - item.cost) / item.cost) * 100;
     const targetGap = typeof item.targetPrice === "number" ? ((item.targetPrice - item.price) / item.price) * 100 : null;
     const stopGap = typeof item.stopLoss === "number" ? ((item.price - item.stopLoss) / item.price) * 100 : null;
@@ -652,11 +685,12 @@ function buildPortfolioAiRoadmap(
   actions: HoldingAiAction[],
   cashEstimate: number
 ): PortfolioAiRoadmap {
+  const portfolioMarketValue = totalMarketValue(items);
   const highRiskCount = actions.filter((item) => item.score <= 45).length;
   const positiveCount = actions.filter((item) => item.score >= 75).length;
   const averageScore =
     actions.length > 0 ? actions.reduce((sum, item) => sum + item.score, 0) / actions.length : 0;
-  const heavyWeights = items.filter((item) => (item.weight ?? 0) >= 25).length;
+  const heavyWeights = items.filter((item) => holdingWeightPercent(item, portfolioMarketValue) >= 25).length;
 
   return {
     summary:
@@ -764,7 +798,6 @@ export default function App() {
   const [activeHomeSubpage, setActiveHomeSubpage] = useState<HomeSubpageKey>(
     initialHashState.homeSubpage
   );
-  const [activeAiTab, setActiveAiTab] = useState<AiTabKey>("multimodal");
   const [activeMarketTab, setActiveMarketTab] = useState<MarketTabKey>("limitup");
   const [activePortfolioTab, setActivePortfolioTab] = useState<PortfolioTabKey>("holdings");
   const [aiLinkInput, setAiLinkInput] = useState("");
@@ -1095,7 +1128,10 @@ export default function App() {
 
   const currentNav = navItems.find((item) => item.key === activeNav) ?? navItems[0];
   const homeHeadline = marketEvents[0];
-  const investedRatio = Math.round((marketValue / (marketValue + activePortfolioCashEstimate)) * 100);
+  const investedRatio =
+    marketValue + activePortfolioCashEstimate > 0
+      ? (marketValue / (marketValue + activePortfolioCashEstimate)) * 100
+      : 0;
   const dailyPnl = portfolio.reduce(
     (sum, item) => sum + item.shares * item.price * (item.dailyChange / 100),
     0
@@ -2596,7 +2632,7 @@ export default function App() {
                   </div>
                   <div className="portfolio-metric-tile">
                     <span>仓位</span>
-                    <strong>{investedRatio}%</strong>
+                    <strong>{formatPositionPercent(investedRatio)}</strong>
                     <small>现金估算 {currency(activePortfolioCashEstimate)}</small>
                   </div>
                   <div className="portfolio-metric-tile">
@@ -3014,145 +3050,98 @@ export default function App() {
         {activeNav === "ai" && (
           <section className="placeholder-view">
             <article className="card wide">
-              <div className="subnav-row">
-                <button
-                  type="button"
-                  className={`subnav-btn ${activeAiTab === "multimodal" ? "active" : ""}`}
-                  onClick={() => setActiveAiTab("multimodal")}
-                >
-                  多模态分析
-                </button>
-                <button
-                  type="button"
-                  className={`subnav-btn ${activeAiTab === "strategy" ? "active" : ""}`}
-                  onClick={() => setActiveAiTab("strategy")}
-                >
-                  策略诊断
-                </button>
-              </div>
-
-              {activeAiTab === "multimodal" && (
-                <>
-                  <section className="multimodal-layout">
-                    <div className="upload-panel">
-                      <div
-                        className="upload-dropzone"
-                        onDragOver={(event) => event.preventDefault()}
-                        onDrop={handleUploadDrop}
-                      >
-                        <strong>上传视频 / 图片 / 文件</strong>
-                        <p>支持视频、截图、研报 PDF、会议纪要、政策文件、财报和各类文档。</p>
-                        <div className="upload-actions">
-                          <label className="upload-trigger">
-                            选择本地文件
-                            <input
-                              className="hidden-file-input"
-                              type="file"
-                              multiple
-                              onChange={handleFileSelection}
-                            />
-                          </label>
-                          <span className="upload-hint">也可以直接拖拽文件到这里</span>
-                        </div>
-                      </div>
-
-                      <div className="upload-inline-grid">
-                        <div className="upload-input-card">
-                          <strong>视频地址 / 文章地址</strong>
-                          <input
-                            className="real-input"
-                            value={aiLinkInput}
-                            onChange={(event) => setAiLinkInput(event.target.value)}
-                            placeholder="粘贴视频链接、文章链接、网页地址"
-                          />
-                        </div>
-                        <div className="upload-input-card">
-                          <strong>截图补充说明</strong>
-                          <textarea
-                            className="real-textarea compact-textarea"
-                            value={aiNoteInput}
-                            onChange={(event) => setAiNoteInput(event.target.value)}
-                            placeholder="补充截图来源、时间、上下文和你的关注点"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="upload-toolbar">
-                        <button type="button" className="secondary action-btn" onClick={handleAddLinkAsset}>
-                          添加链接到材料列表
-                        </button>
-                        <button type="button" className="action-btn" onClick={handleAnalyze}>
-                          开始分析
-                        </button>
-                      </div>
-
-                      <div className="material-list-card">
-                        <div className="card-head compact-head">
-                          <div>
-                            <p className="section-kicker">Assets</p>
-                            <h2>已导入文件列表</h2>
-                          </div>
-                        </div>
-                        <div className="material-list">
-                          {uploadAssets.map((asset, index) => (
-                            <div className="material-item" key={`${asset.name}-${index}`}>
-                              <strong>{asset.name}</strong>
-                              <span>
-                                {asset.kind} · {asset.source === "file" ? "本地文件" : "外部链接"}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="generated-grid">
-                      <div className="placeholder-card">
-                        <strong>AI 识别特点</strong>
-                        <p>{multimodalOutput.traits}</p>
-                      </div>
-                      <div className="placeholder-card">
-                        <strong>AI 深度分析</strong>
-                        <p>{multimodalOutput.analysis}</p>
-                      </div>
-                      <div className="placeholder-card">
-                        <strong>投资策略</strong>
-                        <p>{multimodalOutput.strategy}</p>
-                      </div>
-                      <div className="placeholder-card">
-                        <strong>风险与偏差提醒</strong>
-                        <p>{multimodalOutput.risk}</p>
-                      </div>
-                    </div>
-                  </section>
-                </>
-              )}
-
-              {activeAiTab === "strategy" && (
-                <>
-                  <p className="placeholder-summary">
-                    这个子页面用于盘前计划、盘中跟踪、仓位诊断、个股打分和盘后复盘。
-                  </p>
-                  <div className="placeholder-grid">
-                    <div className="placeholder-card">
-                      <strong>盘前策略</strong>
-                      <p>根据指数、板块和资金风格生成当日应对计划。</p>
-                    </div>
-                    <div className="placeholder-card">
-                      <strong>盘中解读</strong>
-                      <p>解释异动原因，区分趋势延续、情绪脉冲和资金试盘。</p>
-                    </div>
-                    <div className="placeholder-card">
-                      <strong>个股评分</strong>
-                      <p>从基本面、催化、资金、筹码和风险五维打分。</p>
-                    </div>
-                    <div className="placeholder-card">
-                      <strong>复盘结论</strong>
-                      <p>沉淀当天得失、验证逻辑，并形成下个交易日观察清单。</p>
+              <section className="multimodal-layout">
+                <div className="upload-panel">
+                  <div
+                    className="upload-dropzone"
+                    onDragOver={(event) => event.preventDefault()}
+                    onDrop={handleUploadDrop}
+                  >
+                    <strong>上传视频 / 图片 / 文件</strong>
+                    <p>支持视频、截图、研报 PDF、会议纪要、政策文件、财报和各类文档。</p>
+                    <div className="upload-actions">
+                      <label className="upload-trigger">
+                        选择本地文件
+                        <input
+                          className="hidden-file-input"
+                          type="file"
+                          multiple
+                          onChange={handleFileSelection}
+                        />
+                      </label>
+                      <span className="upload-hint">也可以直接拖拽文件到这里</span>
                     </div>
                   </div>
-                </>
-              )}
+
+                  <div className="upload-inline-grid">
+                    <div className="upload-input-card">
+                      <strong>视频地址 / 文章地址</strong>
+                      <input
+                        className="real-input"
+                        value={aiLinkInput}
+                        onChange={(event) => setAiLinkInput(event.target.value)}
+                        placeholder="粘贴视频链接、文章链接、网页地址"
+                      />
+                    </div>
+                    <div className="upload-input-card">
+                      <strong>截图补充说明</strong>
+                      <textarea
+                        className="real-textarea compact-textarea"
+                        value={aiNoteInput}
+                        onChange={(event) => setAiNoteInput(event.target.value)}
+                        placeholder="补充截图来源、时间、上下文和你的关注点"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="upload-toolbar">
+                    <button type="button" className="secondary action-btn" onClick={handleAddLinkAsset}>
+                      添加链接到材料列表
+                    </button>
+                    <button type="button" className="action-btn" onClick={handleAnalyze}>
+                      开始分析
+                    </button>
+                  </div>
+
+                  <div className="material-list-card">
+                    <div className="card-head compact-head">
+                      <div>
+                        <p className="section-kicker">Assets</p>
+                        <h2>已导入文件列表</h2>
+                      </div>
+                    </div>
+                    <div className="material-list">
+                      {uploadAssets.map((asset, index) => (
+                        <div className="material-item" key={`${asset.name}-${index}`}>
+                          <strong>{asset.name}</strong>
+                          <span>
+                            {asset.kind} · {asset.source === "file" ? "本地文件" : "外部链接"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="generated-grid">
+                  <div className="placeholder-card">
+                    <strong>AI 识别特点</strong>
+                    <p>{multimodalOutput.traits}</p>
+                  </div>
+                  <div className="placeholder-card">
+                    <strong>AI 深度分析</strong>
+                    <p>{multimodalOutput.analysis}</p>
+                  </div>
+                  <div className="placeholder-card">
+                    <strong>投资策略</strong>
+                    <p>{multimodalOutput.strategy}</p>
+                  </div>
+                  <div className="placeholder-card">
+                    <strong>风险与偏差提醒</strong>
+                    <p>{multimodalOutput.risk}</p>
+                  </div>
+                </div>
+              </section>
             </article>
           </section>
         )}
