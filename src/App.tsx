@@ -113,6 +113,18 @@ type MultimodalOutput = {
   risk: string;
 };
 
+function getAssetSourceLabel(source: UploadAsset["source"]) {
+  if (source === "link") {
+    return "外部链接";
+  }
+
+  if (source === "paste") {
+    return "粘贴截图";
+  }
+
+  return "本地文件";
+}
+
 function FieldValue({
   label,
   value,
@@ -246,11 +258,6 @@ interface SiteStructureItem {
   summary: string;
 }
 
-interface AiWorkflowStep {
-  title: string;
-  detail: string;
-}
-
 function parseAppHash(hash: string): {
   nav: NavKey;
   homeSubpage: HomeSubpageKey;
@@ -345,25 +352,6 @@ const siteStructure: SiteStructureItem[] = [
     title: "美股",
     role: "看海外",
     summary: "聚焦纳指、标普、AI 主线、中概和利率预期，观察海外风险偏好如何反馈到本地市场。"
-  }
-];
-
-const aiWorkflowSteps: AiWorkflowStep[] = [
-  {
-    title: "1. 收集材料",
-    detail: "统一接收视频、图片、文件、网页链接和手动备注，不再把输入源拆成多个页面。"
-  },
-  {
-    title: "2. 内容拆解",
-    detail: "对长视频和长文档先做分段、分主题和关键信息抽取，先保留事实，再进入判断。"
-  },
-  {
-    title: "3. 生成总结",
-    detail: "先输出简明文字总结和分段摘要，让你快速确认材料到底讲了什么。"
-  },
-  {
-    title: "4. 输出分析",
-    detail: "最后形成投资分析、策略建议和风险提醒，把内容解读变成可执行动作。"
   }
 ];
 
@@ -956,10 +944,8 @@ function buildPolicyOutput(policyUrl: string, policyTheme: string, policyNote: s
 function buildMultimodalOutput(
   assets: UploadAsset[],
   linkValue: string,
-  noteValue: string,
   runCount: number
 ): MultimodalOutput {
-  const focus = noteValue.trim() || "市场主线与潜在催化";
   const videoAssets = assets.filter((asset) => asset.kind === "视频" || asset.kind === "视频链接");
   const sourceText =
     assets.length > 0
@@ -970,12 +956,12 @@ function buildMultimodalOutput(
   const segmentSummaries =
     videoAssets.length > 0
       ? [
-          `片段一：视频前段主要在交代背景和问题定义，核心线索先落在“${focus}”相关的行业催化与市场预期上。`,
+          "片段一：视频前段主要在交代背景和问题定义，核心线索先落在行业催化、市场预期和事件起点上。",
           `片段二：视频中段更适合由 AI 自动分段抽取关键观点，重点看哪些表述对应真实订单、政策推进或资金共识，而不是情绪噪音。`,
           `片段三：视频后段应重点归纳验证条件、时间窗口和风险点，避免只记住观点而忽略兑现路径。`
         ]
       : [
-          `材料总结：当前材料核心集中在“${focus}”，更适合先提炼事实、观点和潜在催化的边界。`,
+          "材料总结：当前材料更适合先提炼事实、观点和潜在催化的边界。",
           `交叉验证：链接与截图内容需要和公告、官方口径或行业数据互相印证，避免单点信息误导。`
         ];
 
@@ -997,7 +983,6 @@ export default function App() {
   const [activeMarketTab, setActiveMarketTab] = useState<MarketTabKey>("limitup");
   const [activePortfolioTab, setActivePortfolioTab] = useState<PortfolioTabKey>("holdings");
   const [aiLinkInput, setAiLinkInput] = useState("");
-  const [aiNoteInput, setAiNoteInput] = useState("重点判断材料里的产业催化是否能转化为真实投资主线。");
   const [uploadAssets, setUploadAssets] = useState<UploadAsset[]>([]);
   const [uploadAssetsReady, setUploadAssetsReady] = useState(false);
   const [analysisRuns, setAnalysisRuns] = useState(1);
@@ -1346,8 +1331,8 @@ export default function App() {
     [policyUrl, policyTheme, policyNote]
   );
   const multimodalOutput = useMemo(
-    () => buildMultimodalOutput(uploadAssets, aiLinkInput, aiNoteInput, analysisRuns),
-    [uploadAssets, aiLinkInput, aiNoteInput, analysisRuns]
+    () => buildMultimodalOutput(uploadAssets, aiLinkInput, analysisRuns),
+    [uploadAssets, aiLinkInput, analysisRuns]
   );
   const uploadedVideos = useMemo(
     () => uploadAssets.filter((asset) => asset.kind === "视频" && asset.objectUrl),
@@ -1365,26 +1350,17 @@ export default function App() {
       documents
     };
   }, [uploadAssets]);
-  const aiActionBoard = useMemo(
-    () => [
-      {
-        title: "当前输入重点",
-        detail: aiNoteInput.trim() || "先补充你最关心的变量，例如行业催化、情绪传导或业绩兑现。"
-      },
-      {
-        title: "下一步操作",
-        detail:
-          uploadAssets.length > 0
-            ? "先确认文字总结和分段摘要是否准确，再决定要不要继续追问某个片段。"
-            : "先把材料放进来，再让 AI 做第一轮内容拆解和结论归纳。"
-      },
-      {
-        title: "结果用途",
-        detail: "把最终分析沉淀成观察清单、交易假设和验证条件，而不是直接替代交易决策。"
-      }
-    ],
-    [aiNoteInput, uploadAssets.length]
-  );
+  const aiReadiness = useMemo(() => {
+    if (uploadAssets.length >= 3) {
+      return "可进入二次追问";
+    }
+
+    if (uploadAssets.length > 0) {
+      return "适合先跑首轮分析";
+    }
+
+    return "等待导入材料";
+  }, [uploadAssets.length]);
   const portfolioCodes = useMemo(() => portfolio.map((item) => item.code), [portfolio]);
   const portfolioCodeSignature = useMemo(
     () => [...portfolioCodes].sort((left, right) => left.localeCompare(right, "zh-CN")).join(","),
@@ -1967,26 +1943,42 @@ export default function App() {
     mergeAssets(clipboardFiles.map((file) => buildUploadAssetFromFile(file, "paste")));
   }
 
-  function handleAddLinkAsset() {
-    const trimmedLink = aiLinkInput.trim();
-    if (!trimmedLink) {
-      return;
-    }
+  function buildLinkAsset(link: string): UploadAsset {
+    return {
+      id: createUploadAssetId(),
+      name: link,
+      kind: link.includes("video") || link.includes("bilibili") ? "视频链接" : "文章链接",
+      source: "link",
+      linkUrl: link
+    };
+  }
 
-    setUploadAssets((current) => [
-      ...current,
-      {
-        id: createUploadAssetId(),
-        name: trimmedLink,
-        kind: trimmedLink.includes("video") || trimmedLink.includes("bilibili") ? "视频链接" : "文章链接",
-        source: "link",
-        linkUrl: trimmedLink
+  function handleRemoveAsset(assetId: string) {
+    setUploadAssets((current) => {
+      const target = current.find((asset) => asset.id === assetId);
+
+      if (target?.objectUrl) {
+        URL.revokeObjectURL(target.objectUrl);
       }
-    ]);
-    setAiLinkInput("");
+
+      return current.filter((asset) => asset.id !== assetId);
+    });
   }
 
   function handleAnalyze() {
+    const trimmedLink = aiLinkInput.trim();
+
+    if (trimmedLink) {
+      setUploadAssets((current) => {
+        const alreadyExists = current.some(
+          (asset) => asset.source === "link" && asset.linkUrl === trimmedLink
+        );
+
+        return alreadyExists ? current : [...current, buildLinkAsset(trimmedLink)];
+      });
+      setAiLinkInput("");
+    }
+
     setAnalysisRuns((count) => count + 1);
   }
 
@@ -2024,7 +2016,8 @@ export default function App() {
       : currentNav.description;
 
   return (
-    <main className="app-shell app-layout">
+    <main className="app-shell">
+      <div className="app-layout">
       <aside className="sidebar">
         <div className="sidebar-brand">
           <span className="brand-mark">IP</span>
@@ -2053,6 +2046,13 @@ export default function App() {
 
       <div className="content-area">
         <header className="topbar">
+          <div className="mobile-brand">
+            <span className="brand-mark">IP</span>
+            <div>
+              <strong>InvestPilot</strong>
+              <p>Personal Market Terminal</p>
+            </div>
+          </div>
           <div>
             <p className="section-kicker">Workspace</p>
             <h2>{topbarTitle}</h2>
@@ -3338,50 +3338,6 @@ export default function App() {
                   <h1>AI分析工作台</h1>
                 </div>
               </div>
-              <p className="placeholder-summary">
-                这一页先按完整工作流来搭结构：先收材料，再做拆解，然后输出总结与分析，最后沉淀成可执行结论。后面我们再继续把真实模型、转写和分段能力逐步接进来。
-              </p>
-
-              <div className="ai-overview-grid">
-                <div className="placeholder-card">
-                  <span className="structure-role">输入</span>
-                  <strong>{aiMaterialSummary.total} 份材料</strong>
-                  <p>当前工作台里已经导入的视频、图片、文件和链接总数。</p>
-                </div>
-                <div className="placeholder-card">
-                  <span className="structure-role">视频</span>
-                  <strong>{aiMaterialSummary.videos} 段</strong>
-                  <p>长视频不限制时长，默认按后续分段处理的结构来设计。</p>
-                </div>
-                <div className="placeholder-card">
-                  <span className="structure-role">图片</span>
-                  <strong>{aiMaterialSummary.images} 张</strong>
-                  <p>支持直接贴图、上传截图和从材料中补充局部上下文。</p>
-                </div>
-                <div className="placeholder-card">
-                  <span className="structure-role">结果</span>
-                  <strong>{analysisRuns} 轮</strong>
-                  <p>每轮分析都按“文字总结 → 分段摘要 → 最终分析”输出。</p>
-                </div>
-              </div>
-
-              <section className="ai-structure-section">
-                <div className="card-head">
-                  <div>
-                    <p className="section-kicker">Flow</p>
-                    <h2>分析流程</h2>
-                  </div>
-                </div>
-                <div className="placeholder-grid">
-                  {aiWorkflowSteps.map((step) => (
-                    <div className="placeholder-card" key={step.title}>
-                      <strong>{step.title}</strong>
-                      <p>{step.detail}</p>
-                    </div>
-                  ))}
-                </div>
-              </section>
-
               <section className="multimodal-layout">
                 <div className="upload-panel">
                   <div className="card-head compact-head">
@@ -3395,6 +3351,28 @@ export default function App() {
                     onPaste={handleUploadPaste}
                     tabIndex={0}
                   >
+                    <div className="ai-panel-banner">
+                      <div>
+                        <span className="structure-role">Intake</span>
+                        <strong>材料先归档，再分析</strong>
+                        <p>先把视频、截图、纪要和外链放进统一队列，后续再接转写、OCR 和引用追溯会更顺。</p>
+                      </div>
+                      <div className="ai-banner-stats">
+                        <div className="ai-banner-stat">
+                          <span>材料总数</span>
+                          <strong>{aiMaterialSummary.total}</strong>
+                        </div>
+                        <div className="ai-banner-stat">
+                          <span>视频数量</span>
+                          <strong>{aiMaterialSummary.videos}</strong>
+                        </div>
+                        <div className="ai-banner-stat">
+                          <span>当前状态</span>
+                          <strong>{aiReadiness}</strong>
+                        </div>
+                      </div>
+                    </div>
+
                     <div
                       className="upload-dropzone"
                       onDragOver={(event) => event.preventDefault()}
@@ -3417,32 +3395,21 @@ export default function App() {
                     </div>
 
                     <div className="upload-inline-grid">
-                      <div className="upload-input-card">
-                        <strong>视频地址 / 文章地址</strong>
+                      <div className="upload-input-card upload-input-card-wide">
+                        <strong>补充视频地址 / 文章地址</strong>
                         <input
                           className="real-input"
                           value={aiLinkInput}
                           onChange={(event) => setAiLinkInput(event.target.value)}
-                          placeholder="粘贴视频链接、文章链接、网页地址"
+                          placeholder="可选：粘贴视频链接、文章链接、网页地址"
                         />
-                      </div>
-                      <div className="upload-input-card">
-                        <strong>截图补充说明</strong>
-                        <textarea
-                          className="real-textarea compact-textarea"
-                          value={aiNoteInput}
-                          onChange={(event) => setAiNoteInput(event.target.value)}
-                          placeholder="补充截图来源、时间、上下文和你的关注点"
-                        />
+                        <p>如果有外部链接，点击 AI分析 时会自动并入当前材料队列一起解析。</p>
                       </div>
                     </div>
 
                     <div className="upload-toolbar">
-                      <button type="button" className="secondary action-btn" onClick={handleAddLinkAsset}>
-                        添加链接到材料列表
-                      </button>
                       <button type="button" className="action-btn" onClick={handleAnalyze}>
-                        开始分析
+                        AI分析
                       </button>
                     </div>
 
@@ -3453,21 +3420,33 @@ export default function App() {
                           <h2>已导入文件列表</h2>
                         </div>
                       </div>
-                      <div className="material-list">
-                        {uploadAssets.map((asset, index) => (
-                          <div className="material-item" key={`${asset.name}-${index}`}>
-                            <strong>{asset.name}</strong>
-                            <span>
-                              {asset.kind} ·{" "}
-                              {asset.source === "link"
-                                ? "外部链接"
-                                : asset.source === "paste"
-                                  ? "粘贴图片"
-                                  : "本地文件"}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
+                      {uploadAssets.length > 0 ? (
+                        <div className="material-list">
+                          {uploadAssets.map((asset) => (
+                            <div className="material-item" key={asset.id}>
+                              <div className="material-item-main">
+                                <span className="material-kind-badge">{asset.kind}</span>
+                                <div>
+                                  <strong>{asset.name}</strong>
+                                  <span>{getAssetSourceLabel(asset.source)}</span>
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                className="material-remove-btn"
+                                onClick={() => handleRemoveAsset(asset.id)}
+                              >
+                                移除
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="ai-empty-state">
+                          <strong>材料队列还是空的</strong>
+                          <p>先拖入视频、文档或截图，再让 AI 基于同一批材料做首轮拆解。</p>
+                        </div>
+                      )}
                     </div>
 
                     {uploadedVideos.length > 0 && (
@@ -3492,20 +3471,16 @@ export default function App() {
                 </div>
 
                 <div className="analysis-flow">
-                  <div className="card-head compact-head">
-                    <div>
-                      <p className="section-kicker">Output</p>
-                      <h2>结果输出</h2>
-                    </div>
-                  </div>
                   <div className="placeholder-card analysis-summary-card">
+                    <span className="structure-role">Run {analysisRuns}</span>
                     <strong>文字总结</strong>
                     <p>{multimodalOutput.summary}</p>
                   </div>
 
                   <div className="generated-grid">
                     {multimodalOutput.segmentSummaries.map((segment, index) => (
-                      <div className="placeholder-card" key={`segment-${index}`}>
+                      <div className="placeholder-card analysis-segment-card" key={`segment-${index}`}>
+                        <span className="structure-role">Segment {index + 1}</span>
                         <strong>{`分段总结 ${index + 1}`}</strong>
                         <p>{segment}</p>
                       </div>
@@ -3514,35 +3489,21 @@ export default function App() {
 
                   <div className="analysis-final-grid">
                     <div className="placeholder-card analysis-final-card">
+                      <span className="structure-role">Synthesis</span>
                       <strong>AI 最终分析</strong>
                       <p>{multimodalOutput.finalAnalysis}</p>
                     </div>
                     <div className="placeholder-card">
+                      <span className="structure-role">Strategy</span>
                       <strong>投资策略</strong>
                       <p>{multimodalOutput.strategy}</p>
                     </div>
                     <div className="placeholder-card">
+                      <span className="structure-role">Risk</span>
                       <strong>风险与偏差提醒</strong>
                       <p>{multimodalOutput.risk}</p>
                     </div>
                   </div>
-
-                  <section className="ai-structure-section">
-                    <div className="card-head compact-head">
-                      <div>
-                        <p className="section-kicker">Action Board</p>
-                        <h2>行动板</h2>
-                      </div>
-                    </div>
-                    <div className="placeholder-grid">
-                      {aiActionBoard.map((item) => (
-                        <div className="placeholder-card" key={item.title}>
-                          <strong>{item.title}</strong>
-                          <p>{item.detail}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
                 </div>
               </section>
             </article>
@@ -3685,6 +3646,21 @@ export default function App() {
           />
         )}
       </div>
+      </div>
+
+      <nav className="mobile-tabbar" aria-label="移动导航">
+        {navItems.map((item) => (
+          <button
+            key={item.key}
+            type="button"
+            className={`mobile-tab-item ${item.key === activeNav ? "active" : ""}`}
+            onClick={() => handleNavChange(item.key)}
+          >
+            <span className="mobile-tab-icon">{item.icon}</span>
+            <span className="mobile-tab-label">{item.label}</span>
+          </button>
+        ))}
+      </nav>
     </main>
   );
 }
