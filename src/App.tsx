@@ -1338,29 +1338,6 @@ export default function App() {
     () => uploadAssets.filter((asset) => asset.kind === "视频" && asset.objectUrl),
     [uploadAssets]
   );
-  const aiMaterialSummary = useMemo(() => {
-    const videos = uploadAssets.filter((asset) => asset.kind === "视频" || asset.kind === "视频链接").length;
-    const images = uploadAssets.filter((asset) => asset.kind === "图片").length;
-    const documents = uploadAssets.filter((asset) => asset.kind === "文件" || asset.kind === "文章链接").length;
-
-    return {
-      total: uploadAssets.length,
-      videos,
-      images,
-      documents
-    };
-  }, [uploadAssets]);
-  const aiReadiness = useMemo(() => {
-    if (uploadAssets.length >= 3) {
-      return "可进入二次追问";
-    }
-
-    if (uploadAssets.length > 0) {
-      return "适合先跑首轮分析";
-    }
-
-    return "等待导入材料";
-  }, [uploadAssets.length]);
   const portfolioCodes = useMemo(() => portfolio.map((item) => item.code), [portfolio]);
   const portfolioCodeSignature = useMemo(
     () => [...portfolioCodes].sort((left, right) => left.localeCompare(right, "zh-CN")).join(","),
@@ -3351,28 +3328,6 @@ export default function App() {
                     onPaste={handleUploadPaste}
                     tabIndex={0}
                   >
-                    <div className="ai-panel-banner">
-                      <div>
-                        <span className="structure-role">Intake</span>
-                        <strong>材料先归档，再分析</strong>
-                        <p>先把视频、截图、纪要和外链放进统一队列，后续再接转写、OCR 和引用追溯会更顺。</p>
-                      </div>
-                      <div className="ai-banner-stats">
-                        <div className="ai-banner-stat">
-                          <span>材料总数</span>
-                          <strong>{aiMaterialSummary.total}</strong>
-                        </div>
-                        <div className="ai-banner-stat">
-                          <span>视频数量</span>
-                          <strong>{aiMaterialSummary.videos}</strong>
-                        </div>
-                        <div className="ai-banner-stat">
-                          <span>当前状态</span>
-                          <strong>{aiReadiness}</strong>
-                        </div>
-                      </div>
-                    </div>
-
                     <div
                       className="upload-dropzone"
                       onDragOver={(event) => event.preventDefault()}

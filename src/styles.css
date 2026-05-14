@@ -720,56 +720,6 @@ h2 {
   box-shadow: 0 0 0 1px rgba(99, 157, 255, 0.15);
 }
 
-.ai-panel-banner {
-  display: grid;
-  grid-template-columns: minmax(0, 1.3fr) minmax(280px, 0.9fr);
-  gap: 18px;
-  padding: 20px;
-  border-radius: 24px;
-  background:
-    radial-gradient(circle at top left, rgba(99, 157, 255, 0.16), transparent 52%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)),
-    rgba(10, 18, 34, 0.56);
-  border: 1px solid rgba(99, 157, 255, 0.18);
-}
-
-.ai-panel-banner strong {
-  display: block;
-  font-size: 1.42rem;
-  margin-bottom: 8px;
-}
-
-.ai-panel-banner p {
-  margin: 0;
-  color: rgba(242, 239, 232, 0.72);
-  line-height: 1.65;
-}
-
-.ai-banner-stats {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.ai-banner-stat {
-  display: grid;
-  gap: 8px;
-  padding: 14px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.ai-banner-stat span {
-  color: rgba(242, 239, 232, 0.56);
-  font-size: 0.82rem;
-}
-
-.ai-banner-stat strong {
-  margin: 0;
-  font-size: 1rem;
-}
-
 .upload-dropzone {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01)),
@@ -2328,7 +2278,6 @@ h2 {
 
   .placeholder-grid,
   .ai-overview-grid,
-  .ai-banner-stats,
   .upload-inline-grid,
   .generated-grid,
   .analysis-final-grid,
@@ -2359,10 +2308,6 @@ h2 {
   }
 
   .stock-detail-layout {
-    grid-template-columns: 1fr;
-  }
-
-  .ai-panel-banner {
     grid-template-columns: 1fr;
   }
 }
@@ -2467,7 +2412,6 @@ h2 {
     grid-template-columns: 1fr;
   }
 
-  .ai-panel-banner,
   .material-item,
   .material-item-main {
     display: grid;
@@ -2626,7 +2570,6 @@ h2 {
 
   .upload-inline-grid,
   .ai-overview-grid,
-  .ai-banner-stats,
   .generated-grid,
   .analysis-final-grid,
   .policy-link-grid {
@@ -2690,8 +2633,7 @@ h2 {
 
   .placeholder-card strong,
   .upload-dropzone strong,
-  .upload-input-card strong,
-  .ai-panel-banner strong {
+  .upload-input-card strong {
     font-size: 1.02rem;
   }
 
