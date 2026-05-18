@@ -3317,12 +3317,6 @@ export default function App() {
               </div>
               <section className="multimodal-layout">
                 <div className="upload-panel">
-                  <div className="card-head compact-head">
-                    <div>
-                      <p className="section-kicker">Input</p>
-                      <h2>材料工作台</h2>
-                    </div>
-                  </div>
                   <div
                     className="upload-composer-card"
                     onPaste={handleUploadPaste}
