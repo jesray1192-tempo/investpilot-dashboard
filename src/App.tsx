@@ -943,16 +943,23 @@ function buildPolicyOutput(policyUrl: string, policyTheme: string, policyNote: s
 
 function buildMultimodalOutput(
   assets: UploadAsset[],
-  linkValue: string,
   runCount: number
 ): MultimodalOutput {
   const videoAssets = assets.filter((asset) => asset.kind === "视频" || asset.kind === "视频链接");
+  const imageAssets = assets.filter((asset) => asset.kind === "图片");
+  const documentAssets = assets.filter(
+    (asset) => asset.kind === "文件" || asset.kind === "文章链接"
+  );
+  const linkAssets = assets.filter((asset) => asset.source === "link");
+  const primaryAssetNames = assets
+    .slice(0, 3)
+    .map((asset) => asset.name)
+    .join("、");
   const sourceText =
     assets.length > 0
       ? `已导入 ${assets.length} 份材料，覆盖 ${assets.map((asset) => asset.kind).join("、")}`
-      : "当前以链接与文字补充为主";
-  const linkText = linkValue.trim() || "未填写外部链接";
-  const stageText = runCount > 0 ? "已完成一轮初步解读" : "等待开始分析";
+      : "当前还没有可分析材料";
+  const stageText = runCount > 0 ? `已完成第 ${runCount} 轮解读` : "等待开始分析";
   const segmentSummaries =
     videoAssets.length > 0
       ? [
@@ -966,11 +973,11 @@ function buildMultimodalOutput(
         ];
 
   return {
-    summary: `${stageText}。${sourceText}。${videoAssets.length > 0 ? "上传的视频将按内容片段自动拆解总结，不限制时长。" : ""} 当前文字总结优先提炼事实信息、关键观点和可验证的催化线索。`,
+    summary: `${stageText}。${sourceText}。当前材料以${videoAssets.length > 0 ? `${videoAssets.length} 份视频` : ""}${videoAssets.length > 0 && (imageAssets.length > 0 || documentAssets.length > 0) ? "、" : ""}${imageAssets.length > 0 ? `${imageAssets.length} 份图片` : ""}${imageAssets.length > 0 && documentAssets.length > 0 ? "、" : ""}${documentAssets.length > 0 ? `${documentAssets.length} 份文档` : ""}为主，已优先提炼事实信息、关键观点和可验证线索。`,
     segmentSummaries,
-    finalAnalysis: `从内容结构看，链接来源为 ${linkText}。若材料来自长视频，AI 更适合先做分段提炼，再把重复出现的关键词、语气变化和结论依据压缩成可执行观察点，最后再结合你的补充说明做二次归因。`,
-    strategy: `策略上建议先把材料拆成“直接受益”“间接受益”“情绪映射”三类，再优先跟踪最容易形成资金共识的行业龙头与弹性标的。对于尚未证实的结论，宜放入观察清单而不是直接重仓。`,
-    risk: `风险主要在信息截取不完整、视频观点带宣传色彩、文章立场先行以及截图缺少上下文。若单一材料无法和官方数据、公告或行业事实交叉验证，应降低置信度。`
+    finalAnalysis: `本轮分析围绕 ${primaryAssetNames || "当前材料"} 展开。${videoAssets.length > 0 ? "视频材料已按内容逻辑拆成阶段片段，优先识别事件背景、核心观点和结论依据。" : ""}${imageAssets.length > 0 ? "图片材料更偏向抓取关键信息、结论口径和局部证据。" : ""}${documentAssets.length > 0 ? "文档材料则更适合提炼事实表述、数据口径和潜在催化路径。" : ""}${linkAssets.length > 0 ? "外部链接已并入同一轮分析，结果会优先参考链接内容与已上传材料的一致性。" : ""}`,
+    strategy: "策略上建议先把材料拆成“已确认事实”“待验证观点”“潜在催化映射”三层，再优先跟踪最容易形成市场共识的主线方向。",
+    risk: "风险主要在材料片段不完整、单一截图缺少上下文、视频观点带情绪表达，以及文档或外链结论未经公告和行业数据交叉验证。"
   };
 }
 
@@ -985,7 +992,8 @@ export default function App() {
   const [aiLinkInput, setAiLinkInput] = useState("");
   const [uploadAssets, setUploadAssets] = useState<UploadAsset[]>([]);
   const [uploadAssetsReady, setUploadAssetsReady] = useState(false);
-  const [analysisRuns, setAnalysisRuns] = useState(1);
+  const [analysisRuns, setAnalysisRuns] = useState(0);
+  const [lastAnalyzedAssets, setLastAnalyzedAssets] = useState<UploadAsset[]>([]);
   const [policyUrl, setPolicyUrl] = useState("https://www.gov.cn/yaowen/liebiao/202505/content_7024210.htm");
   const [policyTheme, setPolicyTheme] = useState("十五五规划");
   const [policyNote, setPolicyNote] = useState("重点看低空经济、自主可控和设备更新链条。");
@@ -1331,8 +1339,8 @@ export default function App() {
     [policyUrl, policyTheme, policyNote]
   );
   const multimodalOutput = useMemo(
-    () => buildMultimodalOutput(uploadAssets, aiLinkInput, analysisRuns),
-    [uploadAssets, aiLinkInput, analysisRuns]
+    () => (analysisRuns > 0 ? buildMultimodalOutput(lastAnalyzedAssets, analysisRuns) : null),
+    [analysisRuns, lastAnalyzedAssets]
   );
   const uploadedVideos = useMemo(
     () => uploadAssets.filter((asset) => asset.kind === "视频" && asset.objectUrl),
@@ -1944,18 +1952,26 @@ export default function App() {
 
   function handleAnalyze() {
     const trimmedLink = aiLinkInput.trim();
+    let nextAssets = uploadAssets;
 
     if (trimmedLink) {
-      setUploadAssets((current) => {
-        const alreadyExists = current.some(
-          (asset) => asset.source === "link" && asset.linkUrl === trimmedLink
-        );
+      const alreadyExists = uploadAssets.some(
+        (asset) => asset.source === "link" && asset.linkUrl === trimmedLink
+      );
 
-        return alreadyExists ? current : [...current, buildLinkAsset(trimmedLink)];
-      });
+      nextAssets = alreadyExists ? uploadAssets : [...uploadAssets, buildLinkAsset(trimmedLink)];
+
+      if (!alreadyExists) {
+        setUploadAssets(nextAssets);
+      }
       setAiLinkInput("");
     }
 
+    if (nextAssets.length === 0) {
+      return;
+    }
+
+    setLastAnalyzedAssets(nextAssets);
     setAnalysisRuns((count) => count + 1);
   }
 
@@ -3419,41 +3435,43 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="analysis-flow">
-                  <div className="placeholder-card analysis-summary-card">
-                    <span className="structure-role">Run {analysisRuns}</span>
-                    <strong>文字总结</strong>
-                    <p>{multimodalOutput.summary}</p>
-                  </div>
+                {multimodalOutput && (
+                  <div className="analysis-flow">
+                    <div className="placeholder-card analysis-summary-card">
+                      <span className="structure-role">Run {analysisRuns}</span>
+                      <strong>文字总结</strong>
+                      <p>{multimodalOutput.summary}</p>
+                    </div>
 
-                  <div className="generated-grid">
-                    {multimodalOutput.segmentSummaries.map((segment, index) => (
-                      <div className="placeholder-card analysis-segment-card" key={`segment-${index}`}>
-                        <span className="structure-role">Segment {index + 1}</span>
-                        <strong>{`分段总结 ${index + 1}`}</strong>
-                        <p>{segment}</p>
+                    <div className="generated-grid">
+                      {multimodalOutput.segmentSummaries.map((segment, index) => (
+                        <div className="placeholder-card analysis-segment-card" key={`segment-${index}`}>
+                          <span className="structure-role">Segment {index + 1}</span>
+                          <strong>{`分段总结 ${index + 1}`}</strong>
+                          <p>{segment}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="analysis-final-grid">
+                      <div className="placeholder-card analysis-final-card">
+                        <span className="structure-role">Synthesis</span>
+                        <strong>AI 最终分析</strong>
+                        <p>{multimodalOutput.finalAnalysis}</p>
                       </div>
-                    ))}
-                  </div>
-
-                  <div className="analysis-final-grid">
-                    <div className="placeholder-card analysis-final-card">
-                      <span className="structure-role">Synthesis</span>
-                      <strong>AI 最终分析</strong>
-                      <p>{multimodalOutput.finalAnalysis}</p>
-                    </div>
-                    <div className="placeholder-card">
-                      <span className="structure-role">Strategy</span>
-                      <strong>投资策略</strong>
-                      <p>{multimodalOutput.strategy}</p>
-                    </div>
-                    <div className="placeholder-card">
-                      <span className="structure-role">Risk</span>
-                      <strong>风险与偏差提醒</strong>
-                      <p>{multimodalOutput.risk}</p>
+                      <div className="placeholder-card">
+                        <span className="structure-role">Strategy</span>
+                        <strong>投资策略</strong>
+                        <p>{multimodalOutput.strategy}</p>
+                      </div>
+                      <div className="placeholder-card">
+                        <span className="structure-role">Risk</span>
+                        <strong>风险与偏差提醒</strong>
+                        <p>{multimodalOutput.risk}</p>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
               </section>
             </article>
           </section>
