@@ -10,13 +10,22 @@ import {
 } from "./data/mock";
 import { fetchLiveLimitUpPool } from "./services/limitUpPool";
 import { fetchLiveMarketIndices } from "./services/marketIndices";
+import { analyzeStockByManualInput, analyzeStockScreenshotAsset } from "./services/stockScreenshotAnalysis";
 import {
   fetchLiveStockDetail,
   fetchLiveStockQuoteSnapshot,
   fetchLiveStockTrend,
   fetchStockSearchMatch
 } from "./services/stockDetail";
-import { Holding, LimitUpStock, MarketIndex, PortfolioProfile, StockDetail, StockTrendPoint } from "./types";
+import {
+  Holding,
+  LimitUpStock,
+  MarketIndex,
+  MultimodalOutput,
+  PortfolioProfile,
+  StockDetail,
+  StockTrendPoint
+} from "./types";
 
 type NavKey =
   | "home"
@@ -103,14 +112,6 @@ type FundingPlan = {
   ratio: string;
   shares: string;
   reason: string;
-};
-
-type MultimodalOutput = {
-  summary: string;
-  segmentSummaries: string[];
-  finalAnalysis: string;
-  strategy: string;
-  risk: string;
 };
 
 function getAssetSourceLabel(source: UploadAsset["source"]) {
@@ -955,28 +956,128 @@ function buildMultimodalOutput(
     .slice(0, 3)
     .map((asset) => asset.name)
     .join("、");
+  const isStockScreenshotMode = imageAssets.length > 0 && videoAssets.length === 0;
   const sourceText =
     assets.length > 0
       ? `已导入 ${assets.length} 份材料，覆盖 ${assets.map((asset) => asset.kind).join("、")}`
       : "当前还没有可分析材料";
   const stageText = runCount > 0 ? `已完成第 ${runCount} 轮解读` : "等待开始分析";
-  const segmentSummaries =
-    videoAssets.length > 0
-      ? [
-          "片段一：视频前段主要在交代背景和问题定义，核心线索先落在行业催化、市场预期和事件起点上。",
-          `片段二：视频中段更适合由 AI 自动分段抽取关键观点，重点看哪些表述对应真实订单、政策推进或资金共识，而不是情绪噪音。`,
-          `片段三：视频后段应重点归纳验证条件、时间窗口和风险点，避免只记住观点而忽略兑现路径。`
-        ]
-      : [
-          "材料总结：当前材料更适合先提炼事实、观点和潜在催化的边界。",
-          `交叉验证：链接与截图内容需要和公告、官方口径或行业数据互相印证，避免单点信息误导。`
-        ];
+
+  if (isStockScreenshotMode) {
+    return {
+      summary: `${stageText}。${sourceText}。当前结果会直接围绕这只股票的基本面、涨停驱动、题材位置和可执行交易判断展开。`,
+      segmentSummaries: [
+        {
+          label: "Basic",
+          title: "基本面先看什么",
+          body: `这张截图更像单只股票的盘面材料。做基本面判断时，优先看公司主营业务、最近一期业绩增速、利润质量、是否有订单/并购/政策催化，以及流通盘大小。若截图里没有这些信息，就要配合公告、财报和 F10 补齐，不能只靠一张盘面图下结论。`
+        },
+        {
+          label: "Reason",
+          title: "今天涨停原因",
+          body: `今天涨停通常要从四个方向确认：第一，是否有公告、业绩预增、订单落地等直接催化；第二，是否属于当天最强主线题材；第三，是否有板块联动和涨停梯队支撑；第四，是否因小市值、高弹性被资金情绪强化。当前截图更适合作为“盘面强度证据”，但涨停原因仍需要结合消息面核实。`
+        },
+        {
+          label: "Theme",
+          title: "题材归属怎么判断",
+          body: `题材判断不要只看一个标签，要看它究竟是主线核心、跟风补涨还是消息刺激的一日反应。更实用的做法是把它放回所属行业和概念板块里，确认同题材当天是否有批量涨停、龙头是否继续封板、成交额是否支撑持续性。`
+        },
+        {
+          label: "Position",
+          title: "盘面位置和接力价值",
+          body: `判断是否值得参与，先看它在板块里的位置：是最先上板的前排，还是跟着龙头拉升的后排；是缩量强封，还是反复炸板后勉强回封；是首次爆发，还是连续加速后的高位板。前排首板或二板通常更有观察价值，后排跟风和高位一致性板更容易次日承压。`
+        },
+        {
+          label: "Checklist",
+          title: "AI 还应该继续补什么",
+          body: `如果你想让这页真正可用，AI 后续至少还要继续补四个判断点：第一，自动识别截图里的股票名称和代码；第二，对应读取当天涨停原因和概念标签；第三，给出板块内同题材强弱对比；第四，明确提示“可观察”“不建议追”“只适合低吸回踩”等执行结论。`
+        }
+      ],
+      finalAnalysis: `本轮分析围绕 ${primaryAssetNames || "当前股票截图"} 展开。当前更合理的解读方式不是泛泛而谈“材料内容”，而是把这只股票放回它所在板块中看强度位置。如果它是主线题材里的前排涨停，且有明确公告、业绩或事件催化，分析重点就该放在持续性、换手质量和次日接力位置；如果只是后排跟风或午后情绪板，判断标准就要转向次日溢价和兑现压力。`,
+      entryDecision: "是否值得进入，核心看四点：一是它是不是当前最强题材的前排；二是涨停原因是否有硬逻辑而不是纯情绪；三是封单、换手和炸板回封是否健康；四是次日有没有比它位置更优的低位同题材票。如果已经是高位缩量一致性板，追进去的性价比通常不高，更适合等分歧换手后再判断。",
+      peers: "同题材下优先找三类票：第一，板块龙头或辨识度最高的核心股；第二，位置更低、逻辑相同、还没被完全发散的补涨股；第三，成交更大、换手更充分、次日更容易承接的中军品种。理想状态下，这里应该进一步列出“同题材龙头 / 中军 / 低位补涨”三个候选方向，而不是只给原则。",
+      risk: "最大风险是：当前只看到了一张股票截图，没有完整读到公司名称、代码、题材标签、涨停时间结构和公告内容。这样可以先做交易框架分析，但还不足以给出精确买点。真正下判断前，至少要补齐股票名称、今日涨停原因、所属题材、板块梯队位置和是否有龙虎榜/公告支撑。"
+    };
+  }
+
+  if (videoAssets.length > 0) {
+    return {
+      summary: `${stageText}。${sourceText}。当前结果会直接提炼这套方法适用于什么市场、靠什么信号触发、执行时最容易犯什么错。`,
+      segmentSummaries: [
+        {
+          label: "Method",
+          title: "这套方法在讲什么",
+          body: "这类视频通常不是在讲某一只股票，而是在讲一套选股、择时、仓位或复盘方法。分析重点应该先落在方法本身：它到底依赖趋势、情绪、基本面、题材轮动，还是均线/量价之类的技术条件。"
+        },
+        {
+          label: "Scenario",
+          title: "适用场景是什么",
+          body: "投资方法最关键的是边界。要先确认它更适合牛市主升、震荡轮动、短线连板、趋势波段，还是偏中线基本面跟踪。只有先把适用场景讲清楚，后面“能不能用”才有意义。"
+        },
+        {
+          label: "Execution",
+          title: "执行步骤怎么拆",
+          body: "AI 应把这类方法拆成明确步骤：先看哪些筛选条件，再看哪些确认信号，什么情况下入场，什么时候减仓，什么时候止损。否则视频里听起来有逻辑，真正执行时会变成只记得观点，不知道动作。"
+        },
+        {
+          label: "Discipline",
+          title: "仓位和纪律要求",
+          body: "一套方法能不能落地，往往不取决于逻辑本身，而取决于它对仓位、止损、持股周期和容错率的要求。短线方法如果没有纪律约束，很容易被误用成频繁追涨；中线方法如果拿去做日内判断，也会失真。"
+        },
+        {
+          label: "Mistake",
+          title: "最常见的误区",
+          body: "方法视频最容易让人误解的地方有三种：第一，把回测结论当成实时结论；第二，只学买点不学退出；第三，忽略这套方法只在特定市场环境下才有效。AI 应该把这些误区明确标出来。"
+        }
+      ],
+      finalAnalysis: `本轮分析围绕 ${primaryAssetNames || "当前投资方法材料"} 展开。更合理的解读方式不是把它翻成一段摘要，而是判断这套方法到底属于“短线交易框架”“波段策略”“题材跟踪法”还是“仓位纪律法”。只有先识别方法类型，后面才能判断它适不适合你当前的交易风格。`,
+      finalAnalysisTitle: "方法核心判断",
+      entryDecision: "如果你想判断这套方法值不值得学，不要先问收益，先问四个问题：第一，它适用于什么市场环境；第二，它有没有明确入场和退出标准；第三，它对执行纪律要求高不高；第四，你当前的交易风格能不能稳定复现它。四个问题答不清，这套方法就不适合直接照搬。",
+      entryDecisionTitle: "这套方法值不值得用",
+      peers: "同类方法里建议继续对比三类内容：第一，是否有更明确的信号定义；第二，是否给出完整的仓位和止损规则；第三，是否有历史案例说明它在不同市场环境下的表现。后续这页最好把方法按“短线 / 波段 / 中线 / 仓位纪律”分类，便于横向比较。",
+      peersTitle: "同类方法还该看什么",
+      risk: "这类材料的最大风险不是看不懂，而是看懂了却用错场景。任何投资方法只要脱离适用环境、仓位纪律和退出条件，就容易从“方法”变成“故事”。"
+    };
+  }
 
   return {
     summary: `${stageText}。${sourceText}。当前材料以${videoAssets.length > 0 ? `${videoAssets.length} 份视频` : ""}${videoAssets.length > 0 && (imageAssets.length > 0 || documentAssets.length > 0) ? "、" : ""}${imageAssets.length > 0 ? `${imageAssets.length} 份图片` : ""}${imageAssets.length > 0 && documentAssets.length > 0 ? "、" : ""}${documentAssets.length > 0 ? `${documentAssets.length} 份文档` : ""}为主，已优先提炼事实信息、关键观点和可验证线索。`,
-    segmentSummaries,
+    segmentSummaries: videoAssets.length > 0
+      ? [
+          {
+            label: "Segment 1",
+            title: "分段总结 1",
+            body: "片段一：视频前段主要在交代背景和问题定义，核心线索先落在行业催化、市场预期和事件起点上。"
+          },
+          {
+            label: "Segment 2",
+            title: "分段总结 2",
+            body: "片段二：视频中段更适合由 AI 自动分段抽取关键观点，重点看哪些表述对应真实订单、政策推进或资金共识，而不是情绪噪音。"
+          },
+          {
+            label: "Segment 3",
+            title: "分段总结 3",
+            body: "片段三：视频后段应重点归纳验证条件、时间窗口和风险点，避免只记住观点而忽略兑现路径。"
+          }
+        ]
+      : [
+          {
+            label: "Segment 1",
+            title: "分段总结 1",
+            body: "材料总结：当前材料更适合先提炼事实、观点和潜在催化的边界。"
+          },
+          {
+            label: "Segment 2",
+            title: "分段总结 2",
+            body: "交叉验证：链接与截图内容需要和公告、官方口径或行业数据互相印证，避免单点信息误导。"
+          }
+        ],
     finalAnalysis: `本轮分析围绕 ${primaryAssetNames || "当前材料"} 展开。${videoAssets.length > 0 ? "视频材料已按内容逻辑拆成阶段片段，优先识别事件背景、核心观点和结论依据。" : ""}${imageAssets.length > 0 ? "图片材料更偏向抓取关键信息、结论口径和局部证据。" : ""}${documentAssets.length > 0 ? "文档材料则更适合提炼事实表述、数据口径和潜在催化路径。" : ""}${linkAssets.length > 0 ? "外部链接已并入同一轮分析，结果会优先参考链接内容与已上传材料的一致性。" : ""}`,
-    strategy: "策略上建议先把材料拆成“已确认事实”“待验证观点”“潜在催化映射”三层，再优先跟踪最容易形成市场共识的主线方向。",
+    finalAnalysisTitle: "核心判断",
+    entryDecision: "策略上建议先把材料拆成“已确认事实”“待验证观点”“潜在催化映射”三层，再优先跟踪最容易形成市场共识的主线方向。",
+    entryDecisionTitle: "下一步怎么用",
+    peers: "若材料对应到具体主题或个股，下一步应把同题材龙头、中军和补涨方向拉出来并排比较，而不是只看单一材料本身。",
+    peersTitle: "可继续延伸什么",
     risk: "风险主要在材料片段不完整、单一截图缺少上下文、视频观点带情绪表达，以及文档或外链结论未经公告和行业数据交叉验证。"
   };
 }
@@ -993,7 +1094,13 @@ export default function App() {
   const [uploadAssets, setUploadAssets] = useState<UploadAsset[]>([]);
   const [uploadAssetsReady, setUploadAssetsReady] = useState(false);
   const [analysisRuns, setAnalysisRuns] = useState(0);
-  const [lastAnalyzedAssets, setLastAnalyzedAssets] = useState<UploadAsset[]>([]);
+  const [multimodalOutput, setMultimodalOutput] = useState<MultimodalOutput | null>(null);
+  const [analysisLoading, setAnalysisLoading] = useState(false);
+  const [analysisError, setAnalysisError] = useState("");
+  const [manualStockInput, setManualStockInput] = useState("");
+  const shouldShowManualStockConfirm =
+    uploadAssets.some((asset) => asset.kind === "图片") &&
+    !uploadAssets.some((asset) => asset.kind === "视频" || asset.kind === "视频链接");
   const [policyUrl, setPolicyUrl] = useState("https://www.gov.cn/yaowen/liebiao/202505/content_7024210.htm");
   const [policyTheme, setPolicyTheme] = useState("十五五规划");
   const [policyNote, setPolicyNote] = useState("重点看低空经济、自主可控和设备更新链条。");
@@ -1337,10 +1444,6 @@ export default function App() {
   const policyOutput = useMemo(
     () => buildPolicyOutput(policyUrl, policyTheme, policyNote),
     [policyUrl, policyTheme, policyNote]
-  );
-  const multimodalOutput = useMemo(
-    () => (analysisRuns > 0 ? buildMultimodalOutput(lastAnalyzedAssets, analysisRuns) : null),
-    [analysisRuns, lastAnalyzedAssets]
   );
   const uploadedVideos = useMemo(
     () => uploadAssets.filter((asset) => asset.kind === "视频" && asset.objectUrl),
@@ -1950,7 +2053,7 @@ export default function App() {
     });
   }
 
-  function handleAnalyze() {
+  async function handleAnalyze() {
     const trimmedLink = aiLinkInput.trim();
     let nextAssets = uploadAssets;
 
@@ -1971,8 +2074,52 @@ export default function App() {
       return;
     }
 
-    setLastAnalyzedAssets(nextAssets);
-    setAnalysisRuns((count) => count + 1);
+    const nextRun = analysisRuns + 1;
+    const nextImageAsset = nextAssets.find((asset) => asset.kind === "图片" && asset.objectUrl);
+    const shouldUseStockScreenshotAnalysis =
+      Boolean(nextImageAsset) &&
+      nextAssets.every((asset) => asset.kind !== "视频" && asset.kind !== "视频链接");
+
+    setAnalysisLoading(true);
+    setAnalysisError("");
+
+    try {
+      const nextOutput = shouldUseStockScreenshotAnalysis && nextImageAsset
+        ? await analyzeStockScreenshotAsset(nextImageAsset, limitUpStocks, nextRun)
+        : buildMultimodalOutput(nextAssets, nextRun);
+
+      setMultimodalOutput(nextOutput);
+      setAnalysisRuns(nextRun);
+      setManualStockInput(nextOutput.identifiedStock?.code ?? nextOutput.identifiedStock?.name ?? "");
+    } catch (error) {
+      setAnalysisError(error instanceof Error ? error.message : "AI 分析生成失败，请稍后重试。");
+    } finally {
+      setAnalysisLoading(false);
+    }
+  }
+
+  async function handleManualStockAnalyze() {
+    const trimmedInput = manualStockInput.trim();
+
+    if (!trimmedInput) {
+      setAnalysisError("请先输入股票代码或名称。");
+      return;
+    }
+
+    setAnalysisLoading(true);
+    setAnalysisError("");
+
+    try {
+      const nextRun = analysisRuns + 1;
+      const nextOutput = await analyzeStockByManualInput(trimmedInput, limitUpStocks, nextRun);
+
+      setMultimodalOutput(nextOutput);
+      setAnalysisRuns(nextRun);
+    } catch (error) {
+      setAnalysisError(error instanceof Error ? error.message : "手动确认股票后分析失败，请稍后重试。");
+    } finally {
+      setAnalysisLoading(false);
+    }
   }
 
   function handleNavChange(nextNav: NavKey) {
@@ -3373,8 +3520,15 @@ export default function App() {
                     </div>
 
                     <div className="upload-toolbar">
-                      <button type="button" className="action-btn" onClick={handleAnalyze}>
-                        AI分析
+                      <button
+                        type="button"
+                        className="action-btn"
+                        onClick={() => {
+                          void handleAnalyze();
+                        }}
+                        disabled={analysisLoading}
+                      >
+                        {analysisLoading ? "分析中..." : "AI分析"}
                       </button>
                     </div>
 
@@ -3435,10 +3589,100 @@ export default function App() {
                   </div>
                 </div>
 
-                {multimodalOutput && (
+                {analysisError && (
+                  <div className="placeholder-card analysis-summary-card">
+                    <strong>AI 分析失败</strong>
+                    <p>{analysisError}</p>
+                  </div>
+                )}
+
+                {analysisLoading && (
+                  <div className="placeholder-card analysis-summary-card">
+                    <strong>AI 正在分析当前材料</strong>
+                    <p>如果是股票截图，当前会先识别图片文字，再提取股票名称/代码，并结合个股详情与涨停池生成分析。</p>
+                  </div>
+                )}
+
+                {!analysisLoading && multimodalOutput && (
                   <div className="analysis-flow">
+                    {multimodalOutput.entryVerdict && (
+                      <div className="placeholder-card analysis-summary-card">
+                        <span className={`analysis-verdict-chip ${multimodalOutput.entryVerdict.tone}`}>
+                          {multimodalOutput.entryVerdict.label}
+                        </span>
+                      </div>
+                    )}
+
+                    {multimodalOutput.identifiedStock && (
+                      <div className="placeholder-card analysis-summary-card">
+                        <strong>
+                          已识别股票：{multimodalOutput.identifiedStock.name}（{multimodalOutput.identifiedStock.code}）
+                        </strong>
+                        <div className="analysis-detected-grid">
+                          <div className="analysis-detected-item">
+                            <span>股票名称</span>
+                            <strong>{multimodalOutput.identifiedStock.name}</strong>
+                          </div>
+                          <div className="analysis-detected-item">
+                            <span>股票代码</span>
+                            <strong>{multimodalOutput.identifiedStock.code}</strong>
+                          </div>
+                          <div className="analysis-detected-item">
+                            <span>所属行业</span>
+                            <strong>{multimodalOutput.identifiedStock.industry ?? "待补充"}</strong>
+                          </div>
+                          <div className="analysis-detected-item">
+                            <span>今日涨停原因</span>
+                            <strong>{multimodalOutput.identifiedStock.limitUpReason ?? "待确认"}</strong>
+                          </div>
+                          <div className="analysis-detected-item analysis-detected-wide">
+                            <span>题材判断</span>
+                            <strong>{multimodalOutput.identifiedStock.themeJudgement ?? "待确认"}</strong>
+                          </div>
+                          <div className="analysis-detected-item analysis-detected-wide">
+                            <span>OCR 原始识别摘要</span>
+                            <strong>{multimodalOutput.identifiedStock.ocrPreview ?? "暂无识别摘要"}</strong>
+                          </div>
+                        </div>
+                        {multimodalOutput.identifiedStock.keyStats && (
+                          <div className="analysis-stock-stats-grid">
+                            {multimodalOutput.identifiedStock.keyStats.map((item) => (
+                              <div className="analysis-stock-stat-card" key={item.label}>
+                                <span>{item.label}</span>
+                                <strong>{item.value}</strong>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {shouldShowManualStockConfirm && (
+                      <div className="placeholder-card analysis-summary-card">
+                        <span className="structure-role">Manual Confirm</span>
+                        <strong>如果识别不准，可手动确认股票</strong>
+                        <div className="analysis-manual-row">
+                          <input
+                            className="real-input"
+                            value={manualStockInput}
+                            onChange={(event) => setManualStockInput(event.target.value)}
+                            placeholder="输入股票代码或名称，例如 600519 或 贵州茅台"
+                          />
+                          <button
+                            type="button"
+                            className="action-btn"
+                            onClick={() => {
+                              void handleManualStockAnalyze();
+                            }}
+                            disabled={analysisLoading}
+                          >
+                            按这只股票重跑分析
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="placeholder-card analysis-summary-card">
-                      <span className="structure-role">Run {analysisRuns}</span>
                       <strong>文字总结</strong>
                       <p>{multimodalOutput.summary}</p>
                     </div>
@@ -3446,27 +3690,28 @@ export default function App() {
                     <div className="generated-grid">
                       {multimodalOutput.segmentSummaries.map((segment, index) => (
                         <div className="placeholder-card analysis-segment-card" key={`segment-${index}`}>
-                          <span className="structure-role">Segment {index + 1}</span>
-                          <strong>{`分段总结 ${index + 1}`}</strong>
-                          <p>{segment}</p>
+                          <span className="structure-role">{segment.label}</span>
+                          <strong>{segment.title}</strong>
+                          <p>{segment.body}</p>
                         </div>
                       ))}
                     </div>
 
                     <div className="analysis-final-grid">
                       <div className="placeholder-card analysis-final-card">
-                        <span className="structure-role">Synthesis</span>
-                        <strong>AI 最终分析</strong>
+                        <strong>{multimodalOutput.finalAnalysisTitle ?? "核心判断"}</strong>
                         <p>{multimodalOutput.finalAnalysis}</p>
                       </div>
                       <div className="placeholder-card">
-                        <span className="structure-role">Strategy</span>
-                        <strong>投资策略</strong>
-                        <p>{multimodalOutput.strategy}</p>
+                        <strong>{multimodalOutput.entryDecisionTitle ?? "现在是否值得进入"}</strong>
+                        <p>{multimodalOutput.entryDecision}</p>
                       </div>
                       <div className="placeholder-card">
-                        <span className="structure-role">Risk</span>
-                        <strong>风险与偏差提醒</strong>
+                        <strong>{multimodalOutput.peersTitle ?? "同题材可选标的"}</strong>
+                        <p>{multimodalOutput.peers}</p>
+                      </div>
+                      <div className="placeholder-card">
+                        <strong>风险提醒</strong>
                         <p>{multimodalOutput.risk}</p>
                       </div>
                     </div>

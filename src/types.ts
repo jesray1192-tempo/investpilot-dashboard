@@ -127,6 +127,40 @@ export interface StockDetail {
   pb: number | null;
 }
 
+export interface AIAnalysisSegment {
+  label: string;
+  title: string;
+  body: string;
+}
+
+export interface MultimodalOutput {
+  identifiedStock?: {
+    name: string;
+    code: string;
+    industry?: string;
+    limitUpReason?: string;
+    themeJudgement?: string;
+    ocrPreview?: string;
+    keyStats?: Array<{
+      label: string;
+      value: string;
+    }>;
+  } | null;
+  entryVerdict?: {
+    label: string;
+    tone: "positive" | "neutral" | "cautious";
+  } | null;
+  summary: string;
+  segmentSummaries: AIAnalysisSegment[];
+  finalAnalysis: string;
+  finalAnalysisTitle?: string;
+  entryDecision: string;
+  entryDecisionTitle?: string;
+  peers: string;
+  peersTitle?: string;
+  risk: string;
+}
+
 export interface TradeRecord {
   id: string;
   date: string;

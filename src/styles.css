@@ -858,6 +858,102 @@ h2 {
   min-height: 100%;
 }
 
+.analysis-verdict-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  border-radius: 999px;
+  padding: 0.48rem 0.9rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  border: 1px solid transparent;
+}
+
+.analysis-verdict-chip.positive {
+  background: rgba(79, 201, 140, 0.16);
+  border-color: rgba(79, 201, 140, 0.24);
+  color: #9ef0bd;
+}
+
+.analysis-verdict-chip.neutral {
+  background: rgba(99, 157, 255, 0.14);
+  border-color: rgba(99, 157, 255, 0.24);
+  color: #bfd8ff;
+}
+
+.analysis-verdict-chip.cautious {
+  background: rgba(238, 124, 56, 0.16);
+  border-color: rgba(238, 124, 56, 0.24);
+  color: #ffc59a;
+}
+
+.analysis-detected-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.analysis-detected-item {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.analysis-detected-item span {
+  color: rgba(242, 239, 232, 0.56);
+  font-size: 0.84rem;
+}
+
+.analysis-detected-item strong {
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.analysis-detected-wide {
+  grid-column: 1 / -1;
+}
+
+.analysis-stock-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.analysis-stock-stat-card {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02)),
+    rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.analysis-stock-stat-card span {
+  color: rgba(242, 239, 232, 0.56);
+  font-size: 0.84rem;
+}
+
+.analysis-stock-stat-card strong {
+  font-size: 1.15rem;
+  line-height: 1.35;
+}
+
+.analysis-manual-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  margin-top: 14px;
+  align-items: center;
+}
+
 .material-list-card {
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid rgba(255, 255, 255, 0.05);
@@ -2278,6 +2374,9 @@ h2 {
 
   .placeholder-grid,
   .ai-overview-grid,
+  .analysis-detected-grid,
+  .analysis-stock-stats-grid,
+  .analysis-manual-row,
   .upload-inline-grid,
   .generated-grid,
   .analysis-final-grid,
@@ -2570,6 +2669,9 @@ h2 {
 
   .upload-inline-grid,
   .ai-overview-grid,
+  .analysis-detected-grid,
+  .analysis-stock-stats-grid,
+  .analysis-manual-row,
   .generated-grid,
   .analysis-final-grid,
   .policy-link-grid {
