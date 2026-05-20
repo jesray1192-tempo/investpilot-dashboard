@@ -111,6 +111,40 @@ function extractThemeKeywords(reason?: string, industry?: string) {
   return Array.from(new Set(candidates));
 }
 
+function createFallbackDetail(identity: StockIdentity, limitUpMatch: LimitUpStock | null): StockDetail {
+  const inferredMarket = identity.code.startsWith("6") || identity.code.startsWith("9") || identity.code.startsWith("5")
+    ? "SH"
+    : "SZ";
+
+  return {
+    code: identity.code,
+    name: identity.name,
+    market: inferredMarket,
+    industry: limitUpMatch?.industry || "待确认",
+    price: limitUpMatch?.price || 0,
+    changeAmount: 0,
+    changePercent: 0,
+    open: 0,
+    high: 0,
+    low: 0,
+    prevClose: 0,
+    averagePrice: 0,
+    volume: 0,
+    amount: 0,
+    volumeRatio: 0,
+    turnoverRate: 0,
+    amplitude: 0,
+    upLimit: 0,
+    downLimit: 0,
+    totalShares: 0,
+    floatShares: 0,
+    totalMarketCap: 0,
+    floatMarketCap: 0,
+    peTtm: null,
+    pb: null
+  };
+}
+
 function buildPeerIdeas(
   pool: LimitUpStock[],
   stockCode: string,
@@ -212,8 +246,12 @@ function buildStockOutput(
   limitUpMatch: LimitUpStock | null,
   limitUpStocks: LimitUpStock[],
   runCount: number,
-  recognizedText: string
+  recognizedText: string,
+  options?: {
+    detailUnavailable?: boolean;
+  }
 ): MultimodalOutput {
+  const detailUnavailable = options?.detailUnavailable ?? false;
   const reasonText = limitUpMatch
     ? `${identity.name} 今天更可能是沿着“${limitUpMatch.reason}”这条线被资金拉升，所属行业为 ${limitUpMatch.industry}。${limitUpMatch.ladderType === "连板" ? `当前是 ${limitUpMatch.consecutiveBoardCount} 连板，说明它已经进入板块辨识度阶段。` : "当前是首板，说明更多还是新发酵或第一次被资金集中确认。"}`
     : `${identity.name} 当前没有在已拉到的涨停池数据里直接命中，说明今天涨停原因还需要继续结合公告、异动新闻和所属板块走势确认。`;
@@ -251,19 +289,19 @@ function buildStockOutput(
       keyStats: [
         {
           label: "最新价",
-          value: `${detail.price.toFixed(2)}`
+          value: detail.price > 0 ? `${detail.price.toFixed(2)}` : "待确认"
         },
         {
           label: "涨跌幅",
-          value: `${detail.changePercent >= 0 ? "+" : ""}${detail.changePercent.toFixed(2)}%`
+          value: detailUnavailable ? "待确认" : `${detail.changePercent >= 0 ? "+" : ""}${detail.changePercent.toFixed(2)}%`
         },
         {
           label: "总市值",
-          value: formatNumber(detail.totalMarketCap)
+          value: detail.totalMarketCap > 0 ? formatNumber(detail.totalMarketCap) : "待确认"
         },
         {
           label: "流通市值",
-          value: formatNumber(detail.floatMarketCap)
+          value: detail.floatMarketCap > 0 ? formatNumber(detail.floatMarketCap) : "待确认"
         },
         {
           label: "封单强度",
@@ -276,12 +314,16 @@ function buildStockOutput(
       ]
     },
     entryVerdict,
-    summary: `已完成第 ${runCount} 轮解读。当前已从截图里识别到股票为 ${identity.name}（${identity.code}），并结合个股详情与涨停池数据生成分析。`,
+    summary: detailUnavailable
+      ? `已完成第 ${runCount} 轮解读。当前已从截图里识别到股票为 ${identity.name}（${identity.code}），但个股详情接口暂时不可用，因此这版先基于识别结果和涨停池线索生成基础分析。`
+      : `已完成第 ${runCount} 轮解读。当前已从截图里识别到股票为 ${identity.name}（${identity.code}），并结合个股详情与涨停池数据生成分析。`,
     segmentSummaries: [
       {
         label: "Basic",
         title: "基本面与公司画像",
-        body: `${identity.name} 所属行业为 ${detail.industry}，最新价 ${detail.price.toFixed(2)}，涨跌幅 ${detail.changePercent.toFixed(2)}%，总市值约 ${formatNumber(detail.totalMarketCap)}，流通市值约 ${formatNumber(detail.floatMarketCap)}。若它是小市值+题材弹性票，情绪驱动会更强；若是中大市值中军，更要看成交承接和板块持续性。`
+        body: detailUnavailable
+          ? `${identity.name} 当前已识别出股票名称和代码，行业先按 ${detail.industry} 方向暂估，但实时个股详情暂时没有成功返回，所以最新价、涨跌幅、市值这些数据还需要后续补齐。这种情况下，现阶段更适合先看题材归属、涨停原因和板块位置，不宜把结论下得太满。`
+          : `${identity.name} 所属行业为 ${detail.industry}，最新价 ${detail.price.toFixed(2)}，涨跌幅 ${detail.changePercent.toFixed(2)}%，总市值约 ${formatNumber(detail.totalMarketCap)}，流通市值约 ${formatNumber(detail.floatMarketCap)}。若它是小市值+题材弹性票，情绪驱动会更强；若是中大市值中军，更要看成交承接和板块持续性。`
       },
       {
         label: "Reason",
@@ -310,7 +352,9 @@ function buildStockOutput(
     entryDecisionTitle: "现在是否值得进入",
     peers: buildPeerIdeas(limitUpStocks, identity.code, detail.industry, limitUpMatch),
     peersTitle: "同题材可选标的",
-    risk: `当前分析已经能定位到 ${identity.name}，但仍然没有直接读取到公告全文、龙虎榜和截图里的全部盘口细节。所以这版可以用于缩小观察范围，不能替代最终交易确认。`
+    risk: detailUnavailable
+      ? `当前分析已经能定位到 ${identity.name}，但个股详情接口暂时不可用，公告全文、龙虎榜和盘口细节也还没有完整补齐。所以这版适合先判断主线和位置，不适合直接代替最终交易确认。`
+      : `当前分析已经能定位到 ${identity.name}，但仍然没有直接读取到公告全文、龙虎榜和截图里的全部盘口细节。所以这版可以用于缩小观察范围，不能替代最终交易确认。`
   };
 }
 
@@ -333,10 +377,13 @@ export async function analyzeStockScreenshotAsset(
     return buildFallbackOutput(asset.name, runCount, recognizedText);
   }
 
-  const detail = await fetchLiveStockDetail(identity.code);
   const limitUpMatch = limitUpStocks.find((item) => item.code === identity.code) ?? null;
+  const detailResult = await fetchLiveStockDetail(identity.code).catch(() => null);
+  const detail = detailResult ?? createFallbackDetail(identity, limitUpMatch);
 
-  return buildStockOutput(identity, detail, limitUpMatch, limitUpStocks, runCount, recognizedText);
+  return buildStockOutput(identity, detail, limitUpMatch, limitUpStocks, runCount, recognizedText, {
+    detailUnavailable: detailResult === null
+  });
 }
 
 export async function analyzeStockByManualInput(
@@ -345,8 +392,9 @@ export async function analyzeStockByManualInput(
   runCount: number
 ): Promise<MultimodalOutput> {
   const identity = await fetchStockSearchMatch(input);
-  const detail = await fetchLiveStockDetail(identity.code);
   const limitUpMatch = limitUpStocks.find((item) => item.code === identity.code) ?? null;
+  const detailResult = await fetchLiveStockDetail(identity.code).catch(() => null);
+  const detail = detailResult ?? createFallbackDetail(identity, limitUpMatch);
 
   return buildStockOutput(
     identity,
@@ -354,6 +402,9 @@ export async function analyzeStockByManualInput(
     limitUpMatch,
     limitUpStocks,
     runCount,
-    `手动确认股票：${identity.name} ${identity.code}`
+    `手动确认股票：${identity.name} ${identity.code}`,
+    {
+      detailUnavailable: detailResult === null
+    }
   );
 }
