@@ -50,10 +50,6 @@ type LimitUpSortField =
   | "reason";
 type SortDirection = "asc" | "desc";
 type StockTrendRange = 1 | 5;
-type PolicyMaterial = {
-  name: string;
-  kind: string;
-};
 
 type HoldingFormState = {
   code: string;
@@ -253,12 +249,6 @@ interface NavItem {
   description: string;
 }
 
-interface SiteStructureItem {
-  title: string;
-  role: string;
-  summary: string;
-}
-
 function parseAppHash(hash: string): {
   nav: NavKey;
   homeSubpage: HomeSubpageKey;
@@ -276,6 +266,23 @@ function parseAppHash(hash: string): {
   const nav = navItems.find((item) => item.key === navSegment)?.key ?? "home";
 
   if (nav !== "home") {
+    if (nav === "policy" && subpageSegment === "stocks") {
+      const [stockCodeSegment, boardToken, ...boardSegments] = restSegments;
+      const stockCode = stockCodeSegment ? decodeURIComponent(stockCodeSegment) : null;
+      const stockBoardName =
+        boardToken === "board" && boardSegments.length > 0
+          ? decodeURIComponent(boardSegments.join("/"))
+          : null;
+
+      return {
+        nav: "policy",
+        homeSubpage: "overview",
+        boardName: stockBoardName,
+        stockCode,
+        stockBoardName
+      };
+    }
+
     return { nav, homeSubpage: "overview", boardName: null, stockCode: null, stockBoardName: null };
   }
 
@@ -309,90 +316,10 @@ function parseAppHash(hash: string): {
 }
 
 const navItems: NavItem[] = [
-  { key: "home", label: "首页", icon: "◎", description: "指数、板块与市场行情" },
-  { key: "portfolio", label: "我的持仓", icon: "▣", description: "股票仓位与盈亏跟踪" },
-  { key: "ai", label: "AI分析", icon: "✦", description: "多模态内容分析" },
-  { key: "policy", label: "政策分析", icon: "◫", description: "政策、行业与主题催化" },
-  { key: "funds", label: "基金", icon: "◉", description: "基金池、回撤与风格暴露" },
-  { key: "hk", label: "港股", icon: "△", description: "港股通、恒指与主题股" },
-  { key: "us", label: "美股", icon: "◇", description: "纳指、标普与中概跟踪" }
-];
-
-const siteStructure: SiteStructureItem[] = [
-  {
-    title: "首页",
-    role: "看市场",
-    summary: "聚合指数、涨停池、板块强弱、事件快讯和数据来源状态，先回答今天市场在交易什么。"
-  },
-  {
-    title: "我的持仓",
-    role: "管账户",
-    summary: "记录股票、交易、仓位、盈亏、纪律和组合风险，形成你的个人交易操作台。"
-  },
-  {
-    title: "AI分析",
-    role: "解内容",
-    summary: "统一接收视频、图片、文件和链接，先做文字总结，再输出分段结论和最终分析。"
-  },
-  {
-    title: "政策分析",
-    role: "看催化",
-    summary: "跟踪政策、新闻联播、国际局势和行业信号，梳理主题催化与验证路径。"
-  },
-  {
-    title: "基金",
-    role: "看风格",
-    summary: "放基金池、ETF 看板、风格轮动和回撤统计，判断当前市场偏价值、成长还是主题。"
-  },
-  {
-    title: "港股",
-    role: "看南向",
-    summary: "跟踪恒指、港股通、互联网、高股息和创新药，补上 A 股之外的重要映射市场。"
-  },
-  {
-    title: "美股",
-    role: "看海外",
-    summary: "聚焦纳指、标普、AI 主线、中概和利率预期，观察海外风险偏好如何反馈到本地市场。"
-  }
-];
-
-const policyLinks = [
-  {
-    title: "“十五五”规划编制工作",
-    description: "中国政府网关于“十五五”规划编制与建议解读的官方入口。",
-    href: "https://www.gov.cn/yaowen/liebiao/202505/content_7024210.htm",
-    tag: "中国政府网"
-  },
-  {
-    title: "“十五五”规划建议解读",
-    description: "中国政府网政策解读栏目，可持续跟踪规划建议和相关政策说明。",
-    href: "https://www.gov.cn/zhengce/202511/content_7048880.htm",
-    tag: "政策解读"
-  },
-  {
-    title: "国际形势与外交动态",
-    description: "外交部官网官方入口，适合跟踪国际局势、记者会和外交表态。",
-    href: "https://www.mfa.gov.cn/",
-    tag: "外交部"
-  },
-  {
-    title: "外交部例行记者会",
-    description: "观察国际热点、地缘政策和官方口径变化的直接来源。",
-    href: "https://www.mfa.gov.cn/web/",
-    tag: "记者会"
-  },
-  {
-    title: "新闻联播",
-    description: "央视《新闻联播》官方栏目页，可直接回看每日重点议题。",
-    href: "https://tv.cctv.com/lm/xwlb/",
-    tag: "央视官方"
-  },
-  {
-    title: "新闻1+1",
-    description: "央视官方时事评论栏目，适合作为新闻联播后的热点延伸分析入口。",
-    href: "https://news.cctv.com/news_2007/20080627/106156.shtml",
-    tag: "热点分析"
-  }
+  { key: "home", label: "主线看板", icon: "◎", description: "先看今天市场在交易什么" },
+  { key: "policy", label: "个股决策", icon: "◫", description: "围绕单只股票做判断、比较和跟踪" },
+  { key: "ai", label: "材料解读", icon: "✦", description: "上传材料，直接输出个股或题材结论" },
+  { key: "portfolio", label: "我的交易台", icon: "▣", description: "持仓、交易、纪律与复盘执行" }
 ];
 
 function currency(value: number) {
@@ -897,51 +824,6 @@ function buildFundingPlans(actions: HoldingAiAction[]): FundingPlan[] {
     }));
 }
 
-function PlaceholderSection({
-  title,
-  summary,
-  bullets
-}: {
-  title: string;
-  summary: string;
-  bullets: string[];
-}) {
-  return (
-    <section className="placeholder-view">
-      <article className="card wide">
-        <div className="card-head">
-          <div>
-            <p className="section-kicker">Module</p>
-            <h1>{title}</h1>
-          </div>
-        </div>
-        <p className="placeholder-summary">{summary}</p>
-        <div className="placeholder-grid">
-          {bullets.map((item) => (
-            <div className="placeholder-card" key={item}>
-              <strong>{item}</strong>
-              <p>这个模块我可以继续为你补成真实页面和明细数据表。</p>
-            </div>
-          ))}
-        </div>
-      </article>
-    </section>
-  );
-}
-
-function buildPolicyOutput(policyUrl: string, policyTheme: string, policyNote: string) {
-  const theme = policyTheme.trim() || "政策热点";
-  const source = policyUrl.trim() || "官方材料";
-  const note = policyNote.trim() || "当前没有额外备注，默认按政策主线做中性解读。";
-
-  return {
-    summary: `AI 识别到本次材料的核心主题是“${theme}”。来源为 ${source}，当前更偏向中期政策传导，而不是单日情绪扰动。`,
-    analysis: `从政策传导看，这类表述通常先影响预期，再影响订单、投资节奏和资金关注度。结合你的备注“${note}”，当前更值得观察政策落地速度、配套细则和市场是否已经提前交易。`,
-    strategy: `策略上优先跟踪与“${theme}”直接相关的行业龙头、弹性分支和低位补涨方向。若政策仍处在预期发酵阶段，宜先观察主线确认，再分批布局。`,
-    risk: `风险主要在三个地方：第一，政策口径偏原则性，细则未落地；第二，市场可能已经提前透支预期；第三，主题扩散过快时容易出现跟风误判。`
-  };
-}
-
 function buildMultimodalOutput(
   assets: UploadAsset[],
   runCount: number
@@ -1098,17 +980,10 @@ export default function App() {
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [analysisError, setAnalysisError] = useState("");
   const [manualStockInput, setManualStockInput] = useState("");
+  const [decisionInput, setDecisionInput] = useState("");
   const shouldShowManualStockConfirm =
     uploadAssets.some((asset) => asset.kind === "图片") &&
     !uploadAssets.some((asset) => asset.kind === "视频" || asset.kind === "视频链接");
-  const [policyUrl, setPolicyUrl] = useState("https://www.gov.cn/yaowen/liebiao/202505/content_7024210.htm");
-  const [policyTheme, setPolicyTheme] = useState("十五五规划");
-  const [policyNote, setPolicyNote] = useState("重点看低空经济、自主可控和设备更新链条。");
-  const [policyMaterials] = useState<PolicyMaterial[]>([
-    { name: "中国政府网政策链接", kind: "网页链接" },
-    { name: "新闻联播截图摘要", kind: "图片材料" },
-    { name: "行业纪要补充说明", kind: "文本备注" }
-  ]);
   const [marketIndices, setMarketIndices] = useState<MarketIndex[]>([]);
   const [marketIndicesLoading, setMarketIndicesLoading] = useState(true);
   const [marketIndicesError, setMarketIndicesError] = useState("");
@@ -1357,6 +1232,44 @@ export default function App() {
   );
 
   const visibleLimitUpBoards = useMemo(() => limitUpBoards.slice(0, 4), [limitUpBoards]);
+  const topThemeBoards = useMemo(() => limitUpBoards.slice(0, 3), [limitUpBoards]);
+  const frontRunnerStocks = useMemo(
+    () =>
+      [...limitUpStocks]
+        .sort((left, right) => {
+          if (right.consecutiveBoardCount !== left.consecutiveBoardCount) {
+            return right.consecutiveBoardCount - left.consecutiveBoardCount;
+          }
+
+          const sealStrengthGap = parseSealStrength(right.sealStrength) - parseSealStrength(left.sealStrength);
+          if (sealStrengthGap !== 0) {
+            return sealStrengthGap;
+          }
+
+          if (left.openBoardCount !== right.openBoardCount) {
+            return left.openBoardCount - right.openBoardCount;
+          }
+
+          return parseLimitUpTime(left.firstLimitUpTime) - parseLimitUpTime(right.firstLimitUpTime);
+        })
+        .slice(0, 5),
+    [limitUpStocks]
+  );
+  const strongestThemeBoard = topThemeBoards[0] ?? null;
+  const leadStock = frontRunnerStocks[0] ?? null;
+  const backupStock = useMemo(() => {
+    if (!leadStock) {
+      return frontRunnerStocks[1] ?? null;
+    }
+
+    return (
+      frontRunnerStocks.find(
+        (stock) => stock.code !== leadStock.code && stock.industry === leadStock.industry
+      ) ??
+      frontRunnerStocks.find((stock) => stock.code !== leadStock.code) ??
+      null
+    );
+  }, [frontRunnerStocks, leadStock]);
   const effectiveStockBoardName = selectedStockBoardName ?? stockDetail?.industry ?? null;
   const relatedBoardData = useMemo(() => {
     if (!effectiveStockBoardName) {
@@ -1441,10 +1354,6 @@ export default function App() {
   const consecutiveBoardCount = limitUpStocks.filter(
     (stock) => stock.ladderType === "连板"
   ).length;
-  const policyOutput = useMemo(
-    () => buildPolicyOutput(policyUrl, policyTheme, policyNote),
-    [policyUrl, policyTheme, policyNote]
-  );
   const uploadedVideos = useMemo(
     () => uploadAssets.filter((asset) => asset.kind === "视频" && asset.objectUrl),
     [uploadAssets]
@@ -1945,7 +1854,11 @@ export default function App() {
     nextStockBoardName: string | null = null
   ) {
     const nextHash =
-      nextNav !== "home"
+      nextNav === "policy" && nextStockCode
+        ? nextStockBoardName
+          ? `#policy/stocks/${encodeURIComponent(nextStockCode)}/board/${encodeURIComponent(nextStockBoardName)}`
+          : `#policy/stocks/${encodeURIComponent(nextStockCode)}`
+        : nextNav !== "home"
         ? `#${nextNav}`
         : nextHomeSubpage === "events"
           ? "#home/events"
@@ -1977,11 +1890,29 @@ export default function App() {
   }
 
   function navigateStockDetail(code: string, boardName: string | null = null) {
-    setActiveNav("home");
-    setActiveHomeSubpage("stock");
+    setActiveNav("policy");
+    setActiveHomeSubpage("overview");
     setSelectedStockCode(code);
     setSelectedStockBoardName(boardName);
-    updateHash("home", "stock", boardName, code, boardName);
+    updateHash("policy", "overview", boardName, code, boardName);
+  }
+
+  async function handleDecisionSearch() {
+    const trimmedInput = decisionInput.trim();
+
+    if (!trimmedInput) {
+      setStockDetailError("请先输入股票代码或名称。");
+      return;
+    }
+
+    try {
+      const match = await fetchStockSearchMatch(trimmedInput);
+      setDecisionInput("");
+      setStockDetailError("");
+      navigateStockDetail(match.code);
+    } catch (error) {
+      setStockDetailError(error instanceof Error ? error.message : "未找到匹配的股票代码或名称。");
+    }
   }
 
   function handleLimitUpSort(field: LimitUpSortField) {
@@ -2138,21 +2069,25 @@ export default function App() {
 
   const topbarTitle =
     activeNav === "home" && activeHomeSubpage === "events"
-      ? "事件与快讯"
-      : activeNav === "home" && activeHomeSubpage === "stock"
+      ? "今日催化"
+      : activeNav === "policy" && selectedStockCode
         ? stockDetail?.name ?? selectedStockCode ?? "个股详情"
+      : activeNav === "policy"
+        ? "个股决策台"
       : activeNav === "home" && activeHomeSubpage === "boards"
-        ? selectedLimitUpBoardData?.name ?? "全部板块"
+        ? selectedLimitUpBoardData?.name ?? "主线板块"
         : currentNav.label;
   const topbarDescription =
     activeNav === "home" && activeHomeSubpage === "events"
-      ? "当天热点、快讯与情绪扰动列表"
-      : activeNav === "home" && activeHomeSubpage === "stock"
-        ? "实时行情、涨停原因与分时走势"
+      ? "当天热点、快讯与主线催化列表"
+      : activeNav === "policy" && selectedStockCode
+        ? "实时行情、涨停原因、板块位置与同题材比较"
+      : activeNav === "policy"
+        ? "先定位股票，再判断逻辑、位置、替代标的和风险"
       : activeNav === "home" && activeHomeSubpage === "boards"
         ? selectedLimitUpBoardData
-          ? "板块内涨停股票列表"
-          : "按板块查看当日涨停方向"
+          ? "板块内涨停股票与梯队分布"
+          : "按板块查看当日主线方向"
       : currentNav.description;
 
   return (
@@ -2206,8 +2141,8 @@ export default function App() {
               <article className="card wide">
                 <div className="card-head">
                   <div>
-                    <p className="section-kicker">Feeds</p>
-                    <h2>事件与快讯</h2>
+                    <p className="section-kicker">Catalysts</p>
+                    <h2>今日催化与快讯</h2>
                   </div>
                   <button
                     type="button"
@@ -2232,8 +2167,8 @@ export default function App() {
             <section className="market-strip card">
               <div className="market-strip-head">
                 <div className="market-strip-title">
-                  <p className="section-kicker">Market Pulse</p>
-                  <h1>今日市场总览</h1>
+                  <p className="section-kicker">Main Theme</p>
+                  <h1>今日主线看板</h1>
                   <p className="market-strip-meta">
                     {marketIndicesError
                       ? `数据源异常：${marketIndicesError}`
@@ -2258,12 +2193,114 @@ export default function App() {
               </div>
             </section>
 
+            <section className="dashboard-grid">
+              <article className="card full-span">
+                <div className="card-head">
+                  <div>
+                    <p className="section-kicker">Trade First</p>
+                    <h2>今日最强主线、龙头、备选</h2>
+                  </div>
+                </div>
+                <div className="generated-grid">
+                  <div className="placeholder-card">
+                    <span className="structure-role">最强主线</span>
+                    <strong>{strongestThemeBoard?.name ?? "待识别"}</strong>
+                    <p>
+                      {strongestThemeBoard
+                        ? `当前板块内 ${strongestThemeBoard.stocks.length} 家涨停，连板 ${strongestThemeBoard.consecutiveBoardCount} 家，首板 ${strongestThemeBoard.firstBoardCount} 家，高度 ${strongestThemeBoard.maxBoardHeight} 板。`
+                        : "当前还没有可用的板块强度数据。"}
+                    </p>
+                  </div>
+                  <div className="placeholder-card">
+                    <span className="structure-role">当前龙头</span>
+                    <strong>{leadStock ? `${leadStock.name} ${leadStock.code}` : "待识别"}</strong>
+                    <p>
+                      {leadStock
+                        ? `${leadStock.reason}。${leadStock.ladderType}，封单 ${leadStock.sealAmount}，开板 ${leadStock.openBoardCount} 次，适合优先点进个股决策台判断。`
+                        : "当前没有可直接跟踪的前排龙头。"}
+                    </p>
+                  </div>
+                  <div className="placeholder-card">
+                    <span className="structure-role">备选方向</span>
+                    <strong>{backupStock ? `${backupStock.name} ${backupStock.code}` : "待识别"}</strong>
+                    <p>
+                      {backupStock
+                        ? `${backupStock.industry}方向，${backupStock.reason}。如果龙头位置过高或不适合追，优先拿它做同题材替代观察。`
+                        : "当前还没有第二层备选标的。"}
+                    </p>
+                  </div>
+                </div>
+              </article>
+            </section>
+
+            <section className="dashboard-grid">
+              <article className="card full-span">
+                <div className="card-head">
+                  <div>
+                    <p className="section-kicker">Focus First</p>
+                    <h2>先看这 3 个方向</h2>
+                  </div>
+                </div>
+                <div className="generated-grid">
+                  {topThemeBoards.map((board, index) => (
+                    <button
+                      key={board.name}
+                      type="button"
+                      className="placeholder-card limitup-board-card"
+                      onClick={() => {
+                        navigateHomeSubpage("boards", board.name);
+                      }}
+                    >
+                      <span className="structure-role">{`方向 ${index + 1}`}</span>
+                      <strong>{board.name}</strong>
+                      <p>{`板块内 ${board.stocks.length} 家涨停，连板 ${board.consecutiveBoardCount} 家，首板 ${board.firstBoardCount} 家，当前高度 ${board.maxBoardHeight} 板。`}</p>
+                    </button>
+                  ))}
+                  {!limitUpLoading && topThemeBoards.length === 0 && (
+                    <div className="placeholder-card">
+                      <strong>暂无主线方向</strong>
+                      <p>当前还没有拿到可用的涨停池板块数据。</p>
+                    </div>
+                  )}
+                </div>
+              </article>
+
+              <article className="card full-span">
+                <div className="card-head">
+                  <div>
+                    <p className="section-kicker">Front Runners</p>
+                    <h2>前排候选股</h2>
+                  </div>
+                </div>
+                <div className="generated-grid">
+                  {frontRunnerStocks.map((stock) => (
+                    <button
+                      key={stock.code}
+                      type="button"
+                      className="placeholder-card limitup-board-card"
+                      onClick={() => navigateStockDetail(stock.code, stock.industry)}
+                    >
+                      <span className="structure-role">{`${stock.ladderType} · ${stock.industry}`}</span>
+                      <strong>{`${stock.name} ${stock.code}`}</strong>
+                      <p>{`${stock.reason}。封单 ${stock.sealAmount}，开板 ${stock.openBoardCount} 次，首次涨停 ${stock.firstLimitUpTime}。`}</p>
+                    </button>
+                  ))}
+                  {!limitUpLoading && frontRunnerStocks.length === 0 && (
+                    <div className="placeholder-card">
+                      <strong>暂无前排候选股</strong>
+                      <p>当前没有可直接进入个股决策台的强势标的。</p>
+                    </div>
+                  )}
+                </div>
+              </article>
+            </section>
+
             <section className="overview-grid">
               <article className="card wide metric-card market-tabs-card">
                 <div className="card-head">
                   <div>
-                    <p className="section-kicker">Pulse Board</p>
-                    <h2>市场热度与情绪指标</h2>
+                    <p className="section-kicker">Execution Map</p>
+                    <h2>主线强度与情绪温度</h2>
                   </div>
                 </div>
                 <div className="subnav-row market-subnav">
@@ -2449,8 +2486,8 @@ export default function App() {
               <article className="card wide board-trend-card">
                 <div className="card-head">
                   <div>
-                    <p className="section-kicker">Board View</p>
-                    <h2>当日板块</h2>
+                    <p className="section-kicker">Theme Ladders</p>
+                    <h2>主线板块与涨停梯队</h2>
                   </div>
                   <button
                     type="button"
@@ -2504,32 +2541,11 @@ export default function App() {
             </section>
 
             <section className="dashboard-grid">
-              <article className="card full-span">
-                <div className="card-head">
-                  <div>
-                    <p className="section-kicker">Structure</p>
-                    <h2>网站结构</h2>
-                  </div>
-                </div>
-                <p className="placeholder-summary">
-                  这一版先把产品骨架定清楚。首页负责看市场，我的持仓负责管账户，AI 分析负责解读材料，政策/基金/港股/美股负责补足不同维度的决策上下文。
-                </p>
-                <div className="placeholder-grid">
-                  {siteStructure.map((item) => (
-                    <div className="placeholder-card" key={item.title}>
-                      <span className="structure-role">{item.role}</span>
-                      <strong>{item.title}</strong>
-                      <p>{item.summary}</p>
-                    </div>
-                  ))}
-                </div>
-              </article>
-
               <article className="card source-card">
                 <div className="card-head">
                   <div>
-                    <p className="section-kicker">Connectors</p>
-                    <h2>数据来源</h2>
+                    <p className="section-kicker">Data</p>
+                    <h2>决策参考数据源</h2>
                   </div>
                 </div>
                 <div className="source-list source-list-compact">
@@ -2765,30 +2781,71 @@ export default function App() {
           </section>
         )}
 
-        {activeNav === "home" && activeHomeSubpage === "stock" && (
+        {activeNav === "policy" && (
           <section className="home-top-feed">
             <article className="card wide stock-detail-card">
               <div className="card-head">
                 <div>
-                  <p className="section-kicker">Stock Detail</p>
-                  <h2>{stockDetail?.name ?? selectedStockCode ?? "个股详情"}</h2>
+                  <p className="section-kicker">{selectedStockCode ? "Decision Desk" : "Decision Setup"}</p>
+                  <h2>{stockDetail?.name ?? selectedStockCode ?? "个股决策台"}</h2>
                 </div>
-                <button
-                  type="button"
-                  className="secondary action-link"
-                  onClick={() => {
-                    if (selectedLimitUpBoard) {
-                      navigateHomeSubpage("boards", selectedLimitUpBoard);
-                      return;
-                    }
-
-                    navigateHomeSubpage("overview");
-                  }}
-                >
-                  返回上一页
-                </button>
+                {selectedStockCode && (
+                  <button
+                    type="button"
+                    className="secondary action-link"
+                    onClick={() => {
+                      setSelectedStockCode(null);
+                      setSelectedStockBoardName(null);
+                      setStockDetail(null);
+                      setStockTrendPoints([]);
+                      setStockDetailError("");
+                      updateHash("policy", "overview", null);
+                    }}
+                  >
+                    返回决策台
+                  </button>
+                )}
               </div>
 
+              {!selectedStockCode ? (
+                <div className="generated-grid">
+                  <div className="placeholder-card analysis-summary-card">
+                    <strong>先定位你要判断的股票</strong>
+                    <p>从主线看板点进强势股，或直接输入股票代码 / 名称，进入这只股票的实时决策页。</p>
+                    <div className="analysis-manual-row">
+                      <input
+                        className="real-input"
+                        value={decisionInput}
+                        onChange={(event) => setDecisionInput(event.target.value)}
+                        placeholder="输入股票代码或名称，例如 600519 或 胜宏科技"
+                      />
+                      <button
+                        type="button"
+                        className="action-btn"
+                        onClick={() => {
+                          void handleDecisionSearch();
+                        }}
+                      >
+                        打开个股决策
+                      </button>
+                    </div>
+                    {stockDetailError && <p className="topbar-note">{stockDetailError}</p>}
+                  </div>
+                  <div className="placeholder-card">
+                    <strong>这页要回答什么</strong>
+                    <p>这里只回答这只股票为什么涨、现在能不能进、同题材还有谁更值得看。</p>
+                  </div>
+                  <div className="placeholder-card">
+                    <strong>更合理的使用顺序</strong>
+                    <p>先在主线看板确认今日最强方向，再进入前排个股，最后结合 AI 材料解读补齐逻辑和风险。</p>
+                  </div>
+                  <div className="placeholder-card">
+                    <strong>辅助参考</strong>
+                    <p>政策、基金风格、港股映射和美股风险偏好现在都只是辅助证据，不再和主工作区并列。</p>
+                  </div>
+                </div>
+              ) : (
+                <>
               <p className="market-strip-meta">
                 {stockDetailError
                   ? `数据源异常：${stockDetailError}`
@@ -3012,6 +3069,8 @@ export default function App() {
                     {stockDetailLoading ? "请稍候，正在获取真实行情与走势。" : "当前没有可展示的个股详情数据。"}
                   </span>
                 </div>
+              )}
+                </>
               )}
             </article>
           </section>
@@ -3722,141 +3781,6 @@ export default function App() {
           </section>
         )}
 
-        {activeNav === "policy" && (
-          <section className="placeholder-view">
-            <article className="card wide">
-              <p className="placeholder-summary">
-                这里直接汇总政策分析常用的官方来源，优先用于跟踪“十五五”规划、国际形势，以及每日《新闻联播》后的热点延伸分析。
-              </p>
-              <div className="policy-link-grid">
-                {policyLinks.map((link) => (
-                  <a
-                    className="policy-link-card"
-                    href={link.href}
-                    key={link.href}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    <span className="policy-link-tag">{link.tag}</span>
-                    <strong>{link.title}</strong>
-                    <p>{link.description}</p>
-                    <span className="policy-link-action">打开官方页面</span>
-                  </a>
-                ))}
-              </div>
-            </article>
-
-            <article className="card wide">
-              <div className="card-head">
-                <div>
-                  <p className="section-kicker">AI Interpretation</p>
-                  <h2>AI 热点解读区</h2>
-                </div>
-              </div>
-
-              <div className="policy-ai-panel">
-                <div className="upload-panel">
-                  <div className="upload-dropzone">
-                    <strong>粘贴官方链接 / 上传政策材料</strong>
-                    <p>支持政府官网链接、外交部页面、新闻联播回放链接、PDF、截图和纪要材料。</p>
-                    <button type="button">导入政策材料</button>
-                  </div>
-
-                  <div className="upload-inline-grid">
-                    <div className="upload-input-card">
-                      <strong>政策链接或文章地址</strong>
-                      <input
-                        className="real-input"
-                        value={policyUrl}
-                        onChange={(event) => setPolicyUrl(event.target.value)}
-                        placeholder="粘贴中国政府网、外交部、央视网等官方页面地址"
-                      />
-                    </div>
-                    <div className="upload-input-card">
-                      <strong>你的关注主题</strong>
-                      <input
-                        className="real-input"
-                        value={policyTheme}
-                        onChange={(event) => setPolicyTheme(event.target.value)}
-                        placeholder="例如：低空经济、算力、自主可控、外贸、国企改革"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="upload-input-card">
-                    <strong>补充说明 / 你的判断</strong>
-                    <textarea
-                      className="real-textarea"
-                      value={policyNote}
-                      onChange={(event) => setPolicyNote(event.target.value)}
-                      placeholder="写下你最关心的政策传导方向、怀疑点或想让 AI 重点判断的内容"
-                    />
-                  </div>
-
-                  <div className="material-list-card">
-                    <div className="card-head compact-head">
-                      <div>
-                        <p className="section-kicker">Imported</p>
-                        <h2>已导入材料</h2>
-                      </div>
-                    </div>
-                    <div className="material-list">
-                      {policyMaterials.map((material) => (
-                        <div className="material-item" key={`${material.kind}-${material.name}`}>
-                          <strong>{material.name}</strong>
-                          <span>{material.kind}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="generated-grid">
-                  <div className="placeholder-card">
-                    <strong>政策要点摘要</strong>
-                    <p>{policyOutput.summary}</p>
-                  </div>
-                  <div className="placeholder-card">
-                    <strong>热点影响分析</strong>
-                    <p>{policyOutput.analysis}</p>
-                  </div>
-                  <div className="placeholder-card">
-                    <strong>投资策略建议</strong>
-                    <p>{policyOutput.strategy}</p>
-                  </div>
-                  <div className="placeholder-card">
-                    <strong>风险与偏差提醒</strong>
-                    <p>{policyOutput.risk}</p>
-                  </div>
-                </div>
-              </div>
-            </article>
-          </section>
-        )}
-
-        {activeNav === "funds" && (
-          <PlaceholderSection
-            title="基金"
-            summary="这里会放基金池、ETF 看板、风格轮动、回撤分析和申赎跟踪。"
-            bullets={["基金池", "ETF 看板", "风格轮动", "回撤统计"]}
-          />
-        )}
-
-        {activeNav === "hk" && (
-          <PlaceholderSection
-            title="港股"
-            summary="这里会放恒指、科技指数、港股通资金流、互联网和高股息板块跟踪。"
-            bullets={["恒指概览", "港股通", "科技龙头", "高股息观察"]}
-          />
-        )}
-
-        {activeNav === "us" && (
-          <PlaceholderSection
-            title="美股"
-            summary="这里会放标普、纳指、AI 算力链、中概股和美元流动性观察。"
-            bullets={["三大指数", "AI 主线", "中概股", "流动性"]}
-          />
-        )}
       </div>
       </div>
 
