@@ -24,7 +24,8 @@ import {
   MultimodalOutput,
   PortfolioProfile,
   StockDetail,
-  StockTrendPoint
+  StockTrendPoint,
+  TradeRecord
 } from "./types";
 
 type NavKey =
@@ -37,7 +38,7 @@ type NavKey =
   | "us";
 
 type MarketTabKey = "limitup" | "heat" | "turnover";
-type PortfolioTabKey = "holdings" | "trades";
+type PortfolioTabKey = "holdings" | "trades" | "review";
 type HomeSubpageKey = "overview" | "events" | "boards" | "stock";
 type LimitUpSortField =
   | "name"
@@ -59,6 +60,31 @@ type HoldingFormState = {
   targetPrice: string;
   stopLoss: string;
   thesis: string;
+};
+
+type TradeFormState = {
+  date: string;
+  action: "buy" | "sell";
+  code: string;
+  name: string;
+  price: string;
+  shares: string;
+  setup: string;
+  note: string;
+};
+
+type ReviewEmotion = "冷静" | "犹豫" | "冲动" | "恐惧" | "贪婪";
+
+type ReviewFormState = {
+  marketContext: string;
+  plan: string;
+  execution: string;
+  followedPlan: boolean;
+  emotion: ReviewEmotion;
+  mistake: string;
+  lesson: string;
+  outcomePercent: string;
+  rating: string;
 };
 
 type UploadAsset = {
@@ -423,6 +449,38 @@ const emptyHoldingForm: HoldingFormState = {
   targetPrice: "",
   stopLoss: "",
   thesis: ""
+};
+
+function formatDateInput(date: Date) {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function createEmptyTradeForm(): TradeFormState {
+  return {
+    date: formatDateInput(new Date()),
+    action: "buy",
+    code: "",
+    name: "",
+    price: "",
+    shares: "",
+    setup: "",
+    note: ""
+  };
+}
+
+const emptyReviewForm: ReviewFormState = {
+  marketContext: "",
+  plan: "",
+  execution: "",
+  followedPlan: true,
+  emotion: "冷静",
+  mistake: "",
+  lesson: "",
+  outcomePercent: "",
+  rating: "3"
 };
 
 const portfolioProfilesStorageKey = "investpilot-portfolio-profiles";
@@ -1024,6 +1082,12 @@ export default function App() {
   const [holdingFormError, setHoldingFormError] = useState("");
   const [holdingQuotePreview, setHoldingQuotePreview] = useState<number | null>(null);
   const [portfolioQuotesUpdatedAt, setPortfolioQuotesUpdatedAt] = useState("");
+  const [isTradeEditorOpen, setIsTradeEditorOpen] = useState(false);
+  const [tradeForm, setTradeForm] = useState<TradeFormState>(() => createEmptyTradeForm());
+  const [tradeFormError, setTradeFormError] = useState("");
+  const [selectedReviewTradeId, setSelectedReviewTradeId] = useState<string | null>(null);
+  const [reviewForm, setReviewForm] = useState<ReviewFormState>(emptyReviewForm);
+  const [reviewFormError, setReviewFormError] = useState("");
   const activePortfolioProfile = useMemo(
     () =>
       portfolioProfilesState.find((profile) => profile.id === activePortfolioProfileId) ??
@@ -1045,6 +1109,46 @@ export default function App() {
     [activePortfolioCashEstimate, holdingAiActions, portfolio]
   );
   const fundingPlans = useMemo(() => buildFundingPlans(holdingAiActions), [holdingAiActions]);
+  const reviewedTrades = useMemo(
+    () => activeTradeRecords.filter((trade) => trade.review),
+    [activeTradeRecords]
+  );
+  const reviewStats = useMemo(() => {
+    const reviewedCount = reviewedTrades.length;
+    const followedPlanCount = reviewedTrades.filter((trade) => trade.review?.followedPlan).length;
+    const positiveCount = reviewedTrades.filter((trade) => (trade.review?.outcomePercent ?? 0) > 0).length;
+    const averageRating =
+      reviewedCount > 0
+        ? reviewedTrades.reduce((sum, trade) => sum + (trade.review?.rating ?? 0), 0) / reviewedCount
+        : 0;
+    const setupCounts = activeTradeRecords.reduce<Record<string, number>>((counts, trade) => {
+      const setup = trade.setup?.trim();
+      if (setup) {
+        counts[setup] = (counts[setup] ?? 0) + 1;
+      }
+      return counts;
+    }, {});
+    const topSetup =
+      Object.entries(setupCounts).sort((left, right) => right[1] - left[1])[0]?.[0] ?? "尚未形成";
+
+    return {
+      reviewedCount,
+      adherenceRate: reviewedCount ? Math.round((followedPlanCount / reviewedCount) * 100) : 0,
+      positiveRate: reviewedCount ? Math.round((positiveCount / reviewedCount) * 100) : 0,
+      averageRating,
+      topSetup
+    };
+  }, [activeTradeRecords, reviewedTrades]);
+  const selectedReviewTrade =
+    activeTradeRecords.find((trade) => trade.id === selectedReviewTradeId) ?? null;
+  const reviewPatternSummary =
+    reviewStats.reviewedCount < 3
+      ? "至少完成 3 笔复盘后，系统才会开始给出相对可靠的个人模式判断。"
+      : reviewStats.adherenceRate >= 70 && reviewStats.positiveRate >= 50
+        ? `你当前最常使用“${reviewStats.topSetup}”，且计划执行率较高。下一步重点是扩大有效样本，并保持同一套入场和退出标准。`
+        : reviewStats.adherenceRate < 70
+          ? `你当前最常使用“${reviewStats.topSetup}”，但计划执行率偏低。先减少临盘改动，比增加新策略更重要。`
+          : `你当前最常使用“${reviewStats.topSetup}”，执行较稳定，但正收益样本不足。需要收紧入场条件或重新检查退出规则。`;
 
   useEffect(() => {
     if (portfolioProfilesState.some((profile) => profile.id === activePortfolioProfileId)) {
@@ -1403,6 +1507,19 @@ export default function App() {
     );
   }
 
+  function updateActivePortfolioTrades(updater: (current: TradeRecord[]) => TradeRecord[]) {
+    setPortfolioProfilesState((current) =>
+      current.map((profile) =>
+        profile.id === activePortfolioProfileId
+          ? {
+              ...profile,
+              trades: updater(profile.trades)
+            }
+          : profile
+      )
+    );
+  }
+
   function handleHoldingFormChange(event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
     const { name, value } = event.target;
     setHoldingForm((current) => ({ ...current, [name]: value }));
@@ -1484,8 +1601,130 @@ export default function App() {
     updateActivePortfolioHoldings((current) => current.filter((entry) => entry.code !== code));
   }
 
+  function handleTradeFormChange(
+    event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+  ) {
+    const { name, value } = event.target;
+    setTradeForm((current) => ({ ...current, [name]: value }));
+  }
+
+  function handleTradeSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const code = tradeForm.code.trim();
+    const name = tradeForm.name.trim();
+    const price = Number(tradeForm.price);
+    const shares = Number(tradeForm.shares);
+
+    if (!tradeForm.date || !code || !name || !tradeForm.setup.trim()) {
+      setTradeFormError("请完整填写日期、股票、代码和交易模式。");
+      return;
+    }
+
+    if (!Number.isFinite(price) || price <= 0 || !Number.isFinite(shares) || shares <= 0) {
+      setTradeFormError("成交价和成交股数必须大于 0。");
+      return;
+    }
+
+    const nextTrade: TradeRecord = {
+      id: `trade-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      date: tradeForm.date,
+      action: tradeForm.action,
+      code,
+      name,
+      price,
+      shares,
+      setup: tradeForm.setup.trim(),
+      note: tradeForm.note.trim() || "未补充交易备注"
+    };
+
+    updateActivePortfolioTrades((current) => [nextTrade, ...current]);
+    setTradeForm(createEmptyTradeForm());
+    setTradeFormError("");
+    setIsTradeEditorOpen(false);
+  }
+
+  function openTradeReview(trade: TradeRecord) {
+    setSelectedReviewTradeId(trade.id);
+    setReviewForm(
+      trade.review
+        ? {
+            marketContext: trade.review.marketContext,
+            plan: trade.review.plan,
+            execution: trade.review.execution,
+            followedPlan: trade.review.followedPlan,
+            emotion: trade.review.emotion,
+            mistake: trade.review.mistake,
+            lesson: trade.review.lesson,
+            outcomePercent: `${trade.review.outcomePercent}`,
+            rating: `${trade.review.rating}`
+          }
+        : emptyReviewForm
+    );
+    setReviewFormError("");
+    setActivePortfolioTab("review");
+  }
+
+  function handleReviewFormChange(
+    event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+  ) {
+    const { name, value } = event.target;
+    const checked = event.target instanceof HTMLInputElement ? event.target.checked : false;
+    setReviewForm((current) => ({
+      ...current,
+      [name]: name === "followedPlan" ? checked : value
+    }));
+  }
+
+  function handleReviewSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!selectedReviewTradeId) {
+      setReviewFormError("请先选择一笔交易。");
+      return;
+    }
+
+    const outcomePercent = Number(reviewForm.outcomePercent);
+    const rating = Number(reviewForm.rating);
+
+    if (!reviewForm.marketContext.trim() || !reviewForm.plan.trim() || !reviewForm.execution.trim()) {
+      setReviewFormError("请补充市场环境、交易计划和实际执行。");
+      return;
+    }
+
+    if (!Number.isFinite(outcomePercent) || !Number.isFinite(rating) || rating < 1 || rating > 5) {
+      setReviewFormError("请填写有效的结果收益率，执行评分需为 1 到 5 分。");
+      return;
+    }
+
+    updateActivePortfolioTrades((current) =>
+      current.map((trade) =>
+        trade.id === selectedReviewTradeId
+          ? {
+              ...trade,
+              review: {
+                marketContext: reviewForm.marketContext.trim(),
+                plan: reviewForm.plan.trim(),
+                execution: reviewForm.execution.trim(),
+                followedPlan: reviewForm.followedPlan,
+                emotion: reviewForm.emotion,
+                mistake: reviewForm.mistake.trim(),
+                lesson: reviewForm.lesson.trim(),
+                outcomePercent,
+                rating,
+                reviewedAt: new Date().toISOString()
+              }
+            }
+          : trade
+      )
+    );
+    setReviewFormError("");
+  }
+
   useEffect(() => {
     closeHoldingEditor();
+    setIsTradeEditorOpen(false);
+    setSelectedReviewTradeId(null);
+    setReviewForm(emptyReviewForm);
     setActivePortfolioTab("holdings");
   }, [activePortfolioProfileId]);
 
@@ -3150,6 +3389,13 @@ export default function App() {
                   >
                     交易记录
                   </button>
+                  <button
+                    type="button"
+                    className={`subnav-btn ${activePortfolioTab === "review" ? "active" : ""}`}
+                    onClick={() => setActivePortfolioTab("review")}
+                  >
+                    交易复盘
+                  </button>
                 </div>
 
                 {activePortfolioTab === "holdings" && (
@@ -3369,28 +3615,145 @@ export default function App() {
                 )}
 
                 {activePortfolioTab === "trades" && (
-                  <div className="trade-list">
-                    {activeTradeRecords.map((trade) => (
-                      <div className="trade-item" key={trade.id}>
-                        <div>
-                          <strong>
-                            {trade.action === "buy" ? "买入" : "卖出"} {trade.name}
-                          </strong>
-                          <p>
-                            {trade.date} · {trade.code}
-                          </p>
-                        </div>
-                        <div className="trade-side">
-                          <span className={trade.action === "buy" ? "up" : "down"}>
-                            {trade.action === "buy" ? "+" : "-"}
-                            {trade.shares} 股
-                          </span>
-                          <p>
-                            成交价 {currency(trade.price)} · {trade.note}
-                          </p>
-                        </div>
+                  <div className="portfolio-manager">
+                    <div className="portfolio-toolbar">
+                      <div className="portfolio-toolbar-copy">
+                        <strong>交易流水</strong>
+                        <span>记录每次买卖及其交易模式，后续复盘会基于这些样本统计。</span>
                       </div>
-                    ))}
+                      {isEditablePortfolio && (
+                        <button
+                          type="button"
+                          className="action-btn"
+                          onClick={() => setIsTradeEditorOpen((current) => !current)}
+                        >
+                          {isTradeEditorOpen ? "收起录入" : "记录交易"}
+                        </button>
+                      )}
+                    </div>
+
+                    {isEditablePortfolio && isTradeEditorOpen && (
+                      <form className="holding-editor" onSubmit={handleTradeSubmit}>
+                        <div className="holding-form-grid">
+                          <label className="holding-form-field">
+                            <span>交易日期</span>
+                            <input className="real-input" type="date" name="date" value={tradeForm.date} onChange={handleTradeFormChange} />
+                          </label>
+                          <label className="holding-form-field">
+                            <span>方向</span>
+                            <select className="real-input" name="action" value={tradeForm.action} onChange={handleTradeFormChange}>
+                              <option value="buy">买入</option>
+                              <option value="sell">卖出</option>
+                            </select>
+                          </label>
+                          <label className="holding-form-field">
+                            <span>股票代码</span>
+                            <input className="real-input" name="code" value={tradeForm.code} onChange={handleTradeFormChange} placeholder="如 600519" />
+                          </label>
+                          <label className="holding-form-field">
+                            <span>股票名称</span>
+                            <input className="real-input" name="name" value={tradeForm.name} onChange={handleTradeFormChange} placeholder="如 贵州茅台" />
+                          </label>
+                          <label className="holding-form-field">
+                            <span>成交价</span>
+                            <input className="real-input" type="number" min="0" step="0.001" name="price" value={tradeForm.price} onChange={handleTradeFormChange} />
+                          </label>
+                          <label className="holding-form-field">
+                            <span>成交股数</span>
+                            <input className="real-input" type="number" min="1" step="1" name="shares" value={tradeForm.shares} onChange={handleTradeFormChange} />
+                          </label>
+                          <label className="holding-form-field">
+                            <span>交易模式</span>
+                            <input className="real-input" name="setup" value={tradeForm.setup} onChange={handleTradeFormChange} placeholder="如 主线龙头回踩" />
+                          </label>
+                          <label className="holding-form-field">
+                            <span>备注</span>
+                            <input className="real-input" name="note" value={tradeForm.note} onChange={handleTradeFormChange} placeholder="入场依据或临盘情况" />
+                          </label>
+                        </div>
+                        <div className="holding-editor-actions">
+                          {tradeFormError && <p className="form-error">{tradeFormError}</p>}
+                          <button type="submit" className="action-btn">保存交易</button>
+                        </div>
+                      </form>
+                    )}
+
+                    <div className="trade-list">
+                      {activeTradeRecords.map((trade) => (
+                        <div className="trade-item" key={trade.id}>
+                          <div>
+                            <strong>
+                              {trade.action === "buy" ? "买入" : "卖出"} {trade.name}
+                            </strong>
+                            <p>{trade.date} · {trade.code} · {trade.setup || "未标记模式"}</p>
+                          </div>
+                          <div className="trade-side">
+                            <span className={trade.action === "buy" ? "up" : "down"}>
+                              {trade.action === "buy" ? "+" : "-"}{trade.shares} 股
+                            </span>
+                            <p>成交价 {currency(trade.price)} · {trade.note}</p>
+                            {isEditablePortfolio && (
+                              <button type="button" className="inline-action-btn" onClick={() => openTradeReview(trade)}>
+                                {trade.review ? "查看复盘" : "开始复盘"}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {activePortfolioTab === "review" && (
+                  <div className="portfolio-manager">
+                    <div className="portfolio-metric-grid">
+                      <div className="portfolio-metric-tile"><span>已复盘</span><strong>{reviewStats.reviewedCount}</strong><small>共 {activeTradeRecords.length} 笔交易</small></div>
+                      <div className="portfolio-metric-tile"><span>计划执行率</span><strong>{reviewStats.adherenceRate}%</strong><small>是否按原计划操作</small></div>
+                      <div className="portfolio-metric-tile"><span>正收益样本</span><strong>{reviewStats.positiveRate}%</strong><small>仅统计已复盘交易</small></div>
+                      <div className="portfolio-metric-tile"><span>常用模式</span><strong>{reviewStats.topSetup}</strong><small>平均执行评分 {reviewStats.averageRating.toFixed(1)}</small></div>
+                    </div>
+                    <div className="portfolio-toolbar-copy">
+                      <strong>当前规律判断</strong>
+                      <span>{reviewPatternSummary}</span>
+                    </div>
+
+                    {!selectedReviewTrade ? (
+                      <div className="trade-list">
+                        {activeTradeRecords.map((trade) => (
+                          <button type="button" className="trade-item" key={trade.id} onClick={() => openTradeReview(trade)}>
+                            <div>
+                              <strong>{trade.name} · {trade.setup || "未标记模式"}</strong>
+                              <p>{trade.date} · {trade.action === "buy" ? "买入" : "卖出"} · {trade.review ? "已复盘" : "待复盘"}</p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <form className="holding-editor" onSubmit={handleReviewSubmit}>
+                        <div className="holding-editor-head">
+                          <div>
+                            <strong>{selectedReviewTrade.name} · {selectedReviewTrade.setup || "未标记模式"}</strong>
+                            <span>{selectedReviewTrade.date} · 成交价 {currency(selectedReviewTrade.price)}</span>
+                          </div>
+                          <button type="button" className="ghost-btn" onClick={() => setSelectedReviewTradeId(null)}>返回列表</button>
+                        </div>
+                        <div className="holding-form-grid">
+                          <label className="holding-form-field holding-form-field-wide"><span>当时市场环境</span><textarea className="real-textarea compact-textarea" name="marketContext" value={reviewForm.marketContext} onChange={handleReviewFormChange} /></label>
+                          <label className="holding-form-field holding-form-field-wide"><span>原交易计划</span><textarea className="real-textarea compact-textarea" name="plan" value={reviewForm.plan} onChange={handleReviewFormChange} /></label>
+                          <label className="holding-form-field holding-form-field-wide"><span>实际执行</span><textarea className="real-textarea compact-textarea" name="execution" value={reviewForm.execution} onChange={handleReviewFormChange} /></label>
+                          <label className="holding-form-field"><span>交易情绪</span><select className="real-input" name="emotion" value={reviewForm.emotion} onChange={handleReviewFormChange}>{["冷静", "犹豫", "冲动", "恐惧", "贪婪"].map((emotion) => <option key={emotion}>{emotion}</option>)}</select></label>
+                          <label className="holding-form-field"><span>结果收益率 %</span><input className="real-input" type="number" step="0.01" name="outcomePercent" value={reviewForm.outcomePercent} onChange={handleReviewFormChange} /></label>
+                          <label className="holding-form-field"><span>执行评分 1-5</span><input className="real-input" type="number" min="1" max="5" name="rating" value={reviewForm.rating} onChange={handleReviewFormChange} /></label>
+                          <label className="holding-form-field"><span>按计划执行</span><input type="checkbox" name="followedPlan" checked={reviewForm.followedPlan} onChange={handleReviewFormChange} /></label>
+                          <label className="holding-form-field holding-form-field-wide"><span>主要错误</span><textarea className="real-textarea compact-textarea" name="mistake" value={reviewForm.mistake} onChange={handleReviewFormChange} /></label>
+                          <label className="holding-form-field holding-form-field-wide"><span>可复用经验</span><textarea className="real-textarea compact-textarea" name="lesson" value={reviewForm.lesson} onChange={handleReviewFormChange} /></label>
+                        </div>
+                        <div className="holding-editor-actions">
+                          {reviewFormError && <p className="form-error">{reviewFormError}</p>}
+                          <button type="submit" className="action-btn">保存复盘</button>
+                        </div>
+                      </form>
+                    )}
                   </div>
                 )}
               </article>

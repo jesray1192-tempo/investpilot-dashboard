@@ -21,37 +21,18 @@ type EastmoneyLimitUpResponse = {
   };
 };
 
-function jsonp<T>(url: string, callbackParam = "cb") {
-  return new Promise<T>((resolve, reject) => {
-    const callbackName = `eastmoney_jsonp_${Date.now()}_${Math.random()
-      .toString(16)
-      .slice(2)}`;
-    const globalWindow = window as unknown as Record<string, unknown>;
-    const script = document.createElement("script");
-    const timer = window.setTimeout(() => {
-      cleanup();
-      reject(new Error("涨停池请求超时。"));
-    }, 10000);
-
-    const cleanup = () => {
-      window.clearTimeout(timer);
-      delete globalWindow[callbackName];
-      script.remove();
-    };
-
-    globalWindow[callbackName] = (payload: T) => {
-      cleanup();
-      resolve(payload);
-    };
-
-    script.onerror = () => {
-      cleanup();
-      reject(new Error("涨停池脚本加载失败。"));
-    };
-
-    script.src = `${url}${url.includes("?") ? "&" : "?"}${callbackParam}=${callbackName}`;
-    document.body.appendChild(script);
+async function fetchJson<T>(url: string): Promise<T> {
+  const response = await fetch(url, {
+    headers: {
+      Accept: "application/json, text/plain, */*"
+    }
   });
+
+  if (!response.ok) {
+    throw new Error(`涨停池请求失败（${response.status}）。`);
+  }
+
+  return (await response.json()) as T;
 }
 
 function formatTradeDate(date: Date) {
@@ -142,8 +123,8 @@ function mapPoolItem(item: EastmoneyLimitUpItem): LimitUpStock | null {
 }
 
 async function requestLimitUpPool(tradeDate: string) {
-  const response = await jsonp<EastmoneyLimitUpResponse>(
-    `https://push2ex.eastmoney.com/getTopicZTPool?ut=7eea3edcaed734bea9cbfc24409ed989&dpt=wz.ztzt&Pageindex=0&pagesize=200&sort=fbt:asc&date=${tradeDate}`
+  const response = await fetchJson<EastmoneyLimitUpResponse>(
+    `/api/eastmoney/push2ex/getTopicZTPool?ut=7eea3edcaed734bea9cbfc24409ed989&dpt=wz.ztzt&Pageindex=0&pagesize=200&sort=fbt:asc&date=${tradeDate}`
   );
 
   return {

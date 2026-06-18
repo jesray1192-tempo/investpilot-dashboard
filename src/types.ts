@@ -170,6 +170,19 @@ export interface TradeRecord {
   price: number;
   shares: number;
   note: string;
+  setup?: string;
+  review?: {
+    marketContext: string;
+    plan: string;
+    execution: string;
+    followedPlan: boolean;
+    emotion: "冷静" | "犹豫" | "冲动" | "恐惧" | "贪婪";
+    mistake: string;
+    lesson: string;
+    outcomePercent: number;
+    rating: number;
+    reviewedAt: string;
+  };
 }
 
 export interface PortfolioProfile {

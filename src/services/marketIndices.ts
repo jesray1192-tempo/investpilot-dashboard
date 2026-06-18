@@ -22,42 +22,23 @@ const INDEX_CONFIG = [
   { code: "1.000905", name: "中证500" }
 ] as const;
 
-function jsonp<T>(url: string, callbackParam = "cb") {
-  return new Promise<T>((resolve, reject) => {
-    const callbackName = `eastmoney_jsonp_${Date.now()}_${Math.random()
-      .toString(16)
-      .slice(2)}`;
-    const globalWindow = window as unknown as Record<string, unknown>;
-    const script = document.createElement("script");
-    const timer = window.setTimeout(() => {
-      cleanup();
-      reject(new Error("实时行情请求超时。"));
-    }, 10000);
-
-    const cleanup = () => {
-      window.clearTimeout(timer);
-      delete globalWindow[callbackName];
-      script.remove();
-    };
-
-    globalWindow[callbackName] = (payload: T) => {
-      cleanup();
-      resolve(payload);
-    };
-
-    script.onerror = () => {
-      cleanup();
-      reject(new Error("实时行情脚本加载失败。"));
-    };
-
-    script.src = `${url}${url.includes("?") ? "&" : "?"}${callbackParam}=${callbackName}`;
-    document.body.appendChild(script);
+async function fetchJson<T>(url: string): Promise<T> {
+  const response = await fetch(url, {
+    headers: {
+      Accept: "application/json, text/plain, */*"
+    }
   });
+
+  if (!response.ok) {
+    throw new Error(`实时行情请求失败（${response.status}）。`);
+  }
+
+  return (await response.json()) as T;
 }
 
 export async function fetchLiveMarketIndices(): Promise<MarketIndex[]> {
-  const response = await jsonp<EastmoneyResponse>(
-    "https://push2.eastmoney.com/api/qt/ulist.np/get?fltt=2&fields=f12,f13,f14,f2,f3&secids=1.000001,0.399001,0.399006,1.000300,1.000905&ut=fa5fd1943c7b386f172d6893dbfba10b"
+  const response = await fetchJson<EastmoneyResponse>(
+    "/api/eastmoney/push2/api/qt/ulist.np/get?fltt=2&fields=f12,f13,f14,f2,f3&secids=1.000001,0.399001,0.399006,1.000300,1.000905&ut=fa5fd1943c7b386f172d6893dbfba10b"
   );
   const diff = response.data?.diff ?? [];
 
