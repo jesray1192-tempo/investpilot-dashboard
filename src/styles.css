@@ -208,6 +208,20 @@ button.secondary {
   white-space: nowrap;
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.card-actions,
+.decision-queue-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .market-strip,
 .card {
   background: rgba(9, 15, 28, 0.6);
@@ -679,6 +693,427 @@ h2 {
   margin: 0;
   color: rgba(242, 239, 232, 0.7);
   line-height: 1.6;
+}
+
+.intraday-decision-card {
+  display: grid;
+  gap: 18px;
+}
+
+.decision-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 92px;
+  padding: 0.55rem 0.9rem;
+  border-radius: 999px;
+  background: rgba(242, 185, 94, 0.12);
+  border: 1px solid rgba(242, 185, 94, 0.22);
+  color: #ffd798;
+  font-weight: 800;
+}
+
+.decision-status.可交易 {
+  background: rgba(74, 222, 128, 0.12);
+  border-color: rgba(74, 222, 128, 0.24);
+  color: #9ef0b6;
+}
+
+.decision-status.观望,
+.decision-status.等待数据 {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: rgba(242, 239, 232, 0.72);
+}
+
+.decision-summary {
+  margin: 0;
+  color: rgba(242, 239, 232, 0.78);
+  line-height: 1.7;
+  font-size: 1rem;
+}
+
+.decision-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.decision-tile {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.decision-tile span {
+  color: rgba(242, 239, 232, 0.58);
+  font-size: 0.82rem;
+}
+
+.decision-tile strong {
+  color: #f2efe8;
+  line-height: 1.35;
+}
+
+.simple-question-panel {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+  padding: 18px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.028);
+  border: 1px solid rgba(99, 157, 255, 0.14);
+}
+
+.stock-simple-panel {
+  margin-top: 0;
+}
+
+.simple-question-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.simple-question-head h3 {
+  margin: 4px 0 0;
+}
+
+.simple-question-head > strong {
+  padding: 0.45rem 0.78rem;
+  border-radius: 999px;
+  background: rgba(99, 157, 255, 0.12);
+  border: 1px solid rgba(99, 157, 255, 0.24);
+  color: #bcd7ff;
+}
+
+.simple-question-panel p {
+  margin: 0;
+  color: rgba(242, 239, 232, 0.72);
+  line-height: 1.65;
+}
+
+.simple-question-panel p strong {
+  color: rgba(242, 239, 232, 0.9);
+}
+
+.simple-signal-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.simple-signal {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.simple-signal span {
+  color: rgba(242, 239, 232, 0.58);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.simple-signal strong {
+  width: fit-content;
+  padding: 0.25rem 0.52rem;
+  border-radius: 999px;
+  font-size: 0.76rem;
+}
+
+.simple-signal.passed strong {
+  background: rgba(74, 222, 128, 0.12);
+  color: #9ef0b6;
+}
+
+.simple-signal.pending strong {
+  background: rgba(242, 185, 94, 0.12);
+  color: #ffd798;
+}
+
+.simple-signal.failed strong {
+  background: rgba(248, 113, 113, 0.12);
+  color: #ffb1b1;
+}
+
+.investable-board-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.investable-board-card {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  color: #f2efe8;
+  text-align: left;
+  cursor: pointer;
+}
+
+.investable-board-card:hover {
+  border-color: rgba(99, 157, 255, 0.3);
+  background: rgba(99, 157, 255, 0.07);
+}
+
+.investable-board-head {
+  display: grid;
+  gap: 6px;
+}
+
+.investable-board-head span {
+  color: #bcd7ff;
+  font-weight: 800;
+}
+
+.investable-board-head strong {
+  font-size: 1.2rem;
+}
+
+.investable-board-head small {
+  width: fit-content;
+  padding: 0.28rem 0.62rem;
+  border-radius: 999px;
+  background: rgba(99, 157, 255, 0.12);
+  border: 1px solid rgba(99, 157, 255, 0.2);
+  color: rgba(191, 216, 255, 0.95);
+}
+
+.investable-score {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.investable-score strong {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.investable-score span,
+.investable-board-card p {
+  color: rgba(242, 239, 232, 0.68);
+}
+
+.investable-board-card p {
+  margin: 0;
+  line-height: 1.6;
+}
+
+.investable-board-card p strong {
+  color: rgba(242, 239, 232, 0.86);
+}
+
+.holding-theme-card {
+  display: grid;
+  gap: 18px;
+}
+
+.holding-theme-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+.holding-theme-item {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.holding-theme-item strong {
+  display: block;
+}
+
+.holding-theme-item small {
+  color: rgba(242, 239, 232, 0.5);
+}
+
+.holding-theme-item p {
+  margin: 0;
+  color: rgba(242, 239, 232, 0.68);
+  line-height: 1.6;
+}
+
+.holding-theme-item p strong {
+  color: rgba(242, 239, 232, 0.86);
+}
+
+.holding-theme-badge {
+  width: fit-content;
+  padding: 0.28rem 0.62rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(242, 239, 232, 0.72);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.holding-theme-badge.主线相关 {
+  background: rgba(74, 222, 128, 0.12);
+  border-color: rgba(74, 222, 128, 0.24);
+  color: #9ef0b6;
+}
+
+.holding-theme-badge.部分相关 {
+  background: rgba(242, 185, 94, 0.12);
+  border-color: rgba(242, 185, 94, 0.22);
+  color: #ffd798;
+}
+
+.strongest-board-summary {
+  margin-bottom: 18px;
+}
+
+.strongest-stock-list {
+  display: grid;
+  gap: 10px;
+}
+
+.strongest-stock-row {
+  display: grid;
+  grid-template-columns: 34px 44px 1.2fr 0.6fr 0.6fr 0.9fr 0.8fr 0.7fr 76px;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  color: rgba(242, 239, 232, 0.74);
+  text-align: left;
+  cursor: default;
+}
+
+.strongest-stock-row:hover {
+  border-color: rgba(99, 157, 255, 0.3);
+  background: rgba(99, 157, 255, 0.07);
+}
+
+.stock-select-control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  cursor: pointer;
+}
+
+.stock-select-control input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: #639dff;
+}
+
+.stock-row-action {
+  min-height: 34px;
+  padding: 0.45rem 0.72rem;
+  font-size: 0.82rem;
+}
+
+.strongest-stock-rank {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: rgba(99, 157, 255, 0.14);
+  color: #bcd7ff;
+  font-weight: 800;
+}
+
+.strongest-stock-name {
+  display: grid;
+  gap: 2px;
+}
+
+.strongest-stock-name strong {
+  color: #f2efe8;
+}
+
+.strongest-stock-name small {
+  color: rgba(242, 239, 232, 0.5);
+}
+
+.decision-queue-bar,
+.decision-queue-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  border-radius: 16px;
+  background: rgba(99, 157, 255, 0.07);
+  border: 1px solid rgba(99, 157, 255, 0.16);
+}
+
+.decision-queue-bar > span,
+.decision-queue-panel strong {
+  color: rgba(242, 239, 232, 0.88);
+  font-weight: 800;
+}
+
+.decision-queue-panel {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+}
+
+.decision-queue-panel > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.decision-queue-chips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.decision-queue-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0.48rem 0.76rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(242, 239, 232, 0.72);
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.decision-queue-chip span {
+  color: rgba(242, 239, 232, 0.46);
+  font-size: 0.76rem;
+}
+
+.decision-queue-chip.active {
+  background: rgba(233, 180, 135, 0.14);
+  border-color: rgba(233, 180, 135, 0.3);
+  color: #f2efe8;
 }
 
 .ai-overview-grid {
@@ -1228,6 +1663,15 @@ h2 {
   align-items: center;
 }
 
+.limitup-detail-page .limitup-head,
+.limitup-detail-page .limitup-row {
+  grid-template-columns: 44px 1fr 0.72fr 0.7fr 0.8fr 0.75fr 0.9fr 0.8fr 1.9fr;
+}
+
+.select-column-label {
+  color: rgba(242, 239, 232, 0.42);
+}
+
 .limitup-head {
   padding: 0 16px 10px;
   color: rgba(242, 239, 232, 0.56);
@@ -1346,6 +1790,8 @@ h2 {
 
 .stock-hero,
 .stock-trend-card,
+.stock-background-panel,
+.stock-decision-panel,
 .stock-side-card {
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.06);
@@ -1418,6 +1864,136 @@ h2 {
 
 .stock-quote-item strong {
   font-size: 1.05rem;
+}
+
+.stock-background-panel {
+  display: grid;
+  gap: 16px;
+  border-color: rgba(233, 180, 135, 0.16);
+}
+
+.stock-background-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.stock-background-head h3 {
+  margin: 4px 0 0;
+}
+
+.stock-background-head > strong {
+  padding: 0.45rem 0.78rem;
+  border-radius: 999px;
+  background: rgba(233, 180, 135, 0.12);
+  border: 1px solid rgba(233, 180, 135, 0.22);
+  color: #f1d1b4;
+  font-size: 0.86rem;
+}
+
+.stock-theme-tags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.stock-theme-tags span {
+  padding: 0.38rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(242, 239, 232, 0.76);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.stock-background-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.stock-background-grid div {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.stock-background-grid span {
+  color: rgba(242, 239, 232, 0.58);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.stock-background-panel p {
+  margin: 0;
+  color: rgba(242, 239, 232, 0.72);
+  line-height: 1.65;
+}
+
+.stock-background-panel p strong {
+  color: rgba(242, 239, 232, 0.9);
+}
+
+.stock-decision-panel {
+  display: grid;
+  gap: 14px;
+  border-color: rgba(99, 157, 255, 0.16);
+}
+
+.stock-decision-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.stock-decision-head h3 {
+  margin: 4px 0 0;
+}
+
+.stock-decision-head > strong {
+  padding: 0.45rem 0.78rem;
+  border-radius: 999px;
+  background: rgba(99, 157, 255, 0.12);
+  border: 1px solid rgba(99, 157, 255, 0.22);
+  color: #bcd7ff;
+}
+
+.stock-decision-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.stock-decision-grid div {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.stock-decision-grid span {
+  color: rgba(242, 239, 232, 0.58);
+  font-size: 0.82rem;
+}
+
+.stock-decision-panel p {
+  margin: 0;
+  color: rgba(242, 239, 232, 0.72);
+  line-height: 1.65;
+}
+
+.stock-decision-panel p strong {
+  color: rgba(242, 239, 232, 0.9);
 }
 
 .stock-trend-toolbar {
@@ -1718,6 +2294,93 @@ h2 {
   flex-wrap: wrap;
 }
 
+.discipline-panel {
+  display: grid;
+  gap: 18px;
+  padding: 20px;
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.015)),
+    rgba(255, 255, 255, 0.018);
+  border: 1px solid rgba(99, 157, 255, 0.14);
+}
+
+.discipline-steps {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.discipline-steps div {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.discipline-steps strong {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(99, 157, 255, 0.16);
+  color: #bcd7ff;
+}
+
+.discipline-steps span {
+  color: rgba(242, 239, 232, 0.72);
+  line-height: 1.5;
+  font-size: 0.9rem;
+}
+
+.discipline-form {
+  display: grid;
+  gap: 14px;
+}
+
+.discipline-rule-list {
+  display: grid;
+  gap: 12px;
+}
+
+.discipline-rule {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: flex-start;
+  padding: 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.discipline-rule strong {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.discipline-rule p {
+  margin: 4px 0 0;
+  color: rgba(242, 239, 232, 0.72);
+  line-height: 1.55;
+}
+
+.discipline-rule p span {
+  color: rgba(242, 239, 232, 0.5);
+}
+
+.discipline-empty {
+  padding: 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  color: rgba(242, 239, 232, 0.62);
+}
+
 .ghost-btn {
   border-radius: 999px;
   padding: 0.82rem 1.15rem;
@@ -1919,15 +2582,21 @@ h2 {
 }
 
 .pill.positive,
-.up,
 .status.connected {
   color: #80f6b8;
 }
 
 .pill.negative,
-.down,
 .status.restricted {
   color: #ff9e8a;
+}
+
+.up {
+  color: #ff9e8a;
+}
+
+.down {
+  color: #80f6b8;
 }
 
 .status.planned,
@@ -2124,6 +2793,33 @@ h2 {
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.06);
   color: rgba(242, 239, 232, 0.74);
+}
+
+.holding-discipline-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.holding-discipline-grid div {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.holding-discipline-grid span {
+  color: rgba(242, 239, 232, 0.56);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.holding-discipline-grid strong {
+  color: rgba(242, 239, 232, 0.9);
+  font-size: 0.9rem;
+  line-height: 1.45;
 }
 
 .portfolio-ai-funding {
@@ -2342,6 +3038,10 @@ h2 {
   .portfolio-ai-grid {
     grid-template-columns: 1fr;
   }
+
+  .holding-discipline-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 1280px) {
@@ -2400,6 +3100,33 @@ h2 {
 
   .portfolio-metric-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .decision-grid,
+  .simple-signal-grid,
+  .discipline-steps {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .investable-board-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .strongest-stock-row {
+    grid-template-columns: 30px 36px 1.2fr 0.6fr 76px;
+  }
+
+  .strongest-stock-row span:nth-child(n + 5) {
+    display: none;
+  }
+
+  .strongest-stock-row .stock-row-action {
+    display: inline-flex;
+    justify-content: center;
+  }
+
+  .decision-queue-panel {
+    grid-template-columns: 1fr;
   }
 
   .source-meta {
@@ -2470,6 +3197,37 @@ h2 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .decision-grid,
+  .simple-signal-grid,
+  .discipline-steps {
+    grid-template-columns: 1fr;
+  }
+
+  .strongest-stock-row {
+    grid-template-columns: 28px 34px 1fr;
+  }
+
+  .strongest-stock-row span:nth-child(n + 3) {
+    display: none;
+  }
+
+  .strongest-stock-row .strongest-stock-name,
+  .strongest-stock-row .stock-row-action {
+    display: grid;
+  }
+
+  .strongest-stock-row .stock-row-action {
+    grid-column: 1 / -1;
+    justify-content: center;
+    width: 100%;
+  }
+
+  .decision-queue-bar,
+  .decision-queue-actions {
+    display: grid;
+    justify-content: stretch;
+  }
+
   .portfolio-toolbar,
   .holding-editor-head,
   .holding-editor-actions {
@@ -2505,6 +3263,10 @@ h2 {
 
   .stock-quote-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .stock-background-grid {
+    grid-template-columns: 1fr;
   }
 
   .stock-trend-visual {

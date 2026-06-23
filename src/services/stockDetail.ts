@@ -56,6 +56,13 @@ type EastmoneyStockSearchResponse = {
   };
 };
 
+type CachedApiResponse<T> = {
+  ok: boolean;
+  status: "live" | "fresh-cache" | "stale-cache" | "error";
+  data?: T;
+  error?: string;
+};
+
 async function fetchJson<T>(url: string): Promise<T> {
   const response = await fetch(url, {
     method: "GET",
@@ -69,6 +76,16 @@ async function fetchJson<T>(url: string): Promise<T> {
   }
 
   return (await response.json()) as T;
+}
+
+async function fetchCachedJson<T>(url: string): Promise<T> {
+  const response = await fetchJson<CachedApiResponse<T>>(url);
+
+  if (!response.ok || !response.data) {
+    throw new Error(response.error || "本地数据服务未返回有效数据。");
+  }
+
+  return response.data;
 }
 
 function resolveSecid(code: string) {
@@ -121,8 +138,9 @@ function parseTrendPoint(item: string): StockTrendPoint | null {
 
 export async function fetchLiveStockDetail(code: string): Promise<StockDetail> {
   const secid = resolveSecid(code);
-  const url = `/api/eastmoney/push2/api/qt/stock/get?fltt=2&invt=2&fields=f43,f44,f45,f46,f47,f48,f50,f51,f52,f57,f58,f60,f71,f84,f85,f116,f117,f127,f162,f167,f168,f169,f170,f171&secid=${secid}&ut=fa5fd1943c7b386f172d6893dbfba10b`;
-  const response = await fetchJson<EastmoneyStockDetailResponse>(url);
+  const response = await fetchCachedJson<EastmoneyStockDetailResponse>(
+    `/api/stock/detail?secid=${encodeURIComponent(secid)}`
+  );
   const data = response.data;
 
   if (!data?.f57 || !data.f58) {
@@ -160,8 +178,9 @@ export async function fetchLiveStockDetail(code: string): Promise<StockDetail> {
 
 export async function fetchLiveStockTrend(code: string, days: 1 | 5): Promise<StockTrendPoint[]> {
   const secid = resolveSecid(code);
-  const url = `/api/eastmoney/push2his/api/qt/stock/trends2/get?fields1=f1,f2,f3,f4,f5,f6,f7,f8&fields2=f51,f52,f53,f54,f55,f56,f57,f58&iscr=0&ndays=${days}&secid=${secid}&ut=7eea3edcaed734bea9cbfc24409ed989`;
-  const response = await fetchJson<EastmoneyStockTrendResponse>(url);
+  const response = await fetchCachedJson<EastmoneyStockTrendResponse>(
+    `/api/stock/trends?secid=${encodeURIComponent(secid)}&days=${days}`
+  );
   const trends = response.data?.trends ?? [];
   const points = trends.map(parseTrendPoint).filter(Boolean) as StockTrendPoint[];
 
@@ -179,8 +198,9 @@ export async function fetchStockSearchMatch(query: string): Promise<StockSearchM
     throw new Error("请输入股票代码或名称。");
   }
 
-  const url = `/api/eastmoney/search/api/suggest/get?input=${encodeURIComponent(normalizedQuery)}&type=14&token=D43BF722C8E33BDC906FB84D85E326E8&count=10`;
-  const response = await fetchJson<EastmoneyStockSearchResponse>(url);
+  const response = await fetchCachedJson<EastmoneyStockSearchResponse>(
+    `/api/stock/search?input=${encodeURIComponent(normalizedQuery)}`
+  );
   const candidates =
     response.QuotationCodeTable?.Data?.filter(
       (item): item is { Code: string; Name: string } => Boolean(item.Code && item.Name)

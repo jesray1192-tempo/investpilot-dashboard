@@ -7,6 +7,14 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
+      "/api/market": {
+        target: "http://127.0.0.1:8787",
+        changeOrigin: true
+      },
+      "/api/stock": {
+        target: "http://127.0.0.1:8787",
+        changeOrigin: true
+      },
       "/api/eastmoney/push2": {
         target: "https://push2.eastmoney.com",
         changeOrigin: true,

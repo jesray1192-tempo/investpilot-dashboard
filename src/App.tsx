@@ -87,6 +87,85 @@ type ReviewFormState = {
   rating: string;
 };
 
+type LimitUpBoardSummary = {
+  name: string;
+  stocks: LimitUpStock[];
+  firstBoardCount: number;
+  consecutiveBoardCount: number;
+  maxBoardHeight: number;
+  totalSealAmount: number;
+  openBoardCount: number;
+};
+
+type InvestableBoardInsight = {
+  name: string;
+  score: number;
+  stance: string;
+  reason: string;
+  risk: string;
+  board: LimitUpBoardSummary;
+};
+
+type HoldingThemeMatch = {
+  holding: Holding;
+  relation: "主线相关" | "部分相关" | "暂无关联";
+  matchedBoard: string;
+  action: string;
+  reason: string;
+};
+
+type StockDecisionInsight = {
+  verdict: string;
+  action: string;
+  position: string;
+  reason: string;
+  risk: string;
+  nextStep: string;
+};
+
+type StockBackgroundInsight = {
+  title: string;
+  subtitle: string;
+  themeTags: string[];
+  companyContext: string;
+  themeContext: string;
+  boardPosition: string;
+  catalyst: string;
+  compare: string;
+  dataGap: string;
+};
+
+type SimpleQuestionSignal = {
+  name: string;
+  status: "passed" | "pending" | "failed";
+  text: string;
+};
+
+type SimpleQuestionInsight = {
+  verdict: string;
+  summary: string;
+  action: string;
+  signals: SimpleQuestionSignal[];
+};
+
+type DecisionQueueStock = {
+  code: string;
+  name: string;
+  boardName: string | null;
+};
+
+type DisciplineRule = {
+  id: string;
+  name: string;
+  entryRule: string;
+  exitRule: string;
+  positionRule: string;
+  forbiddenRule: string;
+  createdAt: string;
+};
+
+type DisciplineFormState = Omit<DisciplineRule, "id" | "createdAt">;
+
 type UploadAsset = {
   id: string;
   name: string;
@@ -107,6 +186,11 @@ type HoldingAiAction = {
   positionAdvice: string;
   executionRatio: string;
   executionShares: string;
+  holdingState: string;
+  themeRelation: string;
+  disciplineAction: string;
+  riskPosition: string;
+  reviewCheck: string;
   reason: string;
   nextStep: string;
   expectation: string;
@@ -483,8 +567,17 @@ const emptyReviewForm: ReviewFormState = {
   rating: "3"
 };
 
+const emptyDisciplineForm: DisciplineFormState = {
+  name: "",
+  entryRule: "",
+  exitRule: "",
+  positionRule: "",
+  forbiddenRule: ""
+};
+
 const portfolioProfilesStorageKey = "investpilot-portfolio-profiles";
 const activePortfolioProfileStorageKey = "investpilot-active-portfolio-profile";
+const disciplineRulesStorageKey = "investpilot-discipline-rules";
 const uploadAssetsDbName = "investpilot-upload-assets";
 const uploadAssetsStoreName = "assets";
 
@@ -610,6 +703,20 @@ function loadActivePortfolioProfileIdFromStorage() {
   return stored || portfolioProfiles[0]?.id || "mine";
 }
 
+function loadDisciplineRulesFromStorage(): DisciplineRule[] {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  try {
+    const raw = window.localStorage.getItem(disciplineRulesStorageKey);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 function holdingToFormState(item: Holding): HoldingFormState {
   return {
     code: item.code,
@@ -622,8 +729,520 @@ function holdingToFormState(item: Holding): HoldingFormState {
   };
 }
 
+function buildFallbackStockDetail(
+  code: string,
+  name: string,
+  industry: string | null
+): StockDetail {
+  return {
+    code,
+    name,
+    market: code.startsWith("6") ? "SH" : "SZ",
+    industry: industry || "未知行业",
+    price: 0,
+    changeAmount: 0,
+    changePercent: 0,
+    open: 0,
+    high: 0,
+    low: 0,
+    prevClose: 0,
+    averagePrice: 0,
+    volume: 0,
+    amount: 0,
+    volumeRatio: 0,
+    turnoverRate: 0,
+    amplitude: 0,
+    upLimit: 0,
+    downLimit: 0,
+    totalShares: 0,
+    floatShares: 0,
+    totalMarketCap: 0,
+    floatMarketCap: 0,
+    peTtm: null,
+    pb: null
+  };
+}
+
 function totalMarketValue(items: Holding[]) {
   return items.reduce((sum, item) => sum + holdingMarketValue(item), 0);
+}
+
+function buildIntradayDecision({
+  indices,
+  limitUpStocks,
+  strongestTheme,
+  leadStock,
+  backupStock,
+  totalOpenBoardCount,
+  maxLimitUpHeight,
+  firstBoardCount,
+  consecutiveBoardCount
+}: {
+  indices: MarketIndex[];
+  limitUpStocks: LimitUpStock[];
+  strongestTheme: string | null;
+  leadStock: LimitUpStock | null;
+  backupStock: LimitUpStock | null;
+  totalOpenBoardCount: number;
+  maxLimitUpHeight: number;
+  firstBoardCount: number;
+  consecutiveBoardCount: number;
+}) {
+  const indexByName = new Map(indices.map((index) => [index.name, index.change]));
+  const indexChange = (name: string) => indexByName.get(name) ?? 0;
+  const upIndexCount = indices.filter((index) => index.change > 0).length;
+  const downIndexCount = indices.filter((index) => index.change < 0).length;
+  const growthChange = (indexChange("创业板指") + indexChange("科创50")) / 2;
+  const coreChange = (indexChange("上证指数") + indexChange("沪深300")) / 2;
+  const openBoardPressure = limitUpStocks.length ? totalOpenBoardCount / limitUpStocks.length : 0;
+  const hasStrongTheme = Boolean(strongestTheme && limitUpStocks.length >= 20);
+  const hasHighBoard = maxLimitUpHeight >= 3;
+
+  let tradeStatus = "观望";
+  let positionAdvice = "0-2成";
+
+  if (indices.length === 0 || limitUpStocks.length === 0) {
+    tradeStatus = "等待数据";
+    positionAdvice = "不主动开新仓";
+  } else if (upIndexCount >= 4 && hasStrongTheme && openBoardPressure <= 1.2) {
+    tradeStatus = "可交易";
+    positionAdvice = hasHighBoard ? "3-5成" : "2-3成";
+  } else if (downIndexCount >= 4 || openBoardPressure >= 2.2 || !hasStrongTheme) {
+    tradeStatus = "谨慎";
+    positionAdvice = "0-2成";
+  } else {
+    tradeStatus = "谨慎";
+    positionAdvice = "2-3成";
+  }
+
+  const styleBias =
+    growthChange > coreChange + 0.4
+      ? "成长/硬科技强于权重"
+      : coreChange > growthChange + 0.4
+        ? "权重强于成长"
+        : "指数风格相对均衡";
+
+  const leaderStatus =
+    !leadStock
+      ? "暂无可跟踪龙头"
+      : leadStock.openBoardCount >= 2 || leadStock.consecutiveBoardCount >= 4
+        ? "不适合追高"
+        : leadStock.sealStrength === "强" || leadStock.sealStrength === "极强"
+          ? "可观察"
+          : "只适合低吸确认";
+
+  const backupStrategy =
+    tradeStatus === "可交易"
+      ? backupStock
+        ? `优先看 ${backupStock.name} 这类同题材前排确认，不做后排随手买。`
+        : "优先做前排确认，不做后排随手买。"
+      : tradeStatus === "谨慎"
+        ? "备选只做低吸确认，放弃临盘追高。"
+        : "先看不买，等主线和指数方向同步。";
+
+  const risks = [
+    openBoardPressure >= 1.5 ? "开板压力偏高" : "",
+    downIndexCount >= 3 ? "指数分化或拖累" : "",
+    firstBoardCount > consecutiveBoardCount * 4 && consecutiveBoardCount < 5 ? "首板多但连板不足" : "",
+    !hasStrongTheme ? "主线集中度不足" : ""
+  ].filter(Boolean);
+
+  const summary =
+    tradeStatus === "等待数据"
+      ? "正在等待指数和涨停池数据，先不生成交易判断。"
+      : `今日${tradeStatus}。${styleBias}，${strongestTheme ? `最强主线偏向${strongestTheme}` : "主线尚不集中"}，涨停 ${limitUpStocks.length} 家、连板高度 ${maxLimitUpHeight} 板。龙头${leaderStatus}，${backupStrategy}`;
+
+  return {
+    tradeStatus,
+    positionAdvice,
+    strongestTheme: strongestTheme ?? "待识别",
+    leaderStatus,
+    backupStrategy,
+    riskText: risks.length ? risks.join("、") : "暂无明显风险",
+    summary
+  };
+}
+
+function buildInvestableBoardInsights(boards: LimitUpBoardSummary[]): InvestableBoardInsight[] {
+  return boards
+    .map((board) => {
+      const openPressure = board.stocks.length ? board.openBoardCount / board.stocks.length : 0;
+      const sealScore = Math.min(board.totalSealAmount, 20) * 2;
+      const breadthScore = Math.min(board.stocks.length, 12) * 5;
+      const ladderScore = board.consecutiveBoardCount * 8 + board.maxBoardHeight * 7;
+      const pressurePenalty = Math.min(openPressure * 12, 28);
+      const score = Math.max(0, Math.round(breadthScore + ladderScore + sealScore - pressurePenalty));
+      const hasLeader = board.maxBoardHeight >= 3 || board.consecutiveBoardCount >= 2;
+      const stance =
+        score >= 85 && openPressure <= 1.2 && hasLeader
+          ? "重点跟踪"
+          : score >= 62 && openPressure <= 1.8
+            ? "观察前排"
+            : "谨慎观察";
+      const reason = `涨停 ${board.stocks.length} 家，连板 ${board.consecutiveBoardCount} 家，高度 ${board.maxBoardHeight} 板，封单合计约 ${board.totalSealAmount.toFixed(2)} 亿。`;
+      const risk =
+        openPressure >= 1.8
+          ? `开板压力偏高，平均每只约 ${openPressure.toFixed(1)} 次。`
+          : board.consecutiveBoardCount === 0
+            ? "首板为主，持续性还需要次日确认。"
+            : "分歧压力可控，重点看前排能否继续封住。";
+
+      return {
+        name: board.name,
+        score,
+        stance,
+        reason,
+        risk,
+        board
+      };
+    })
+    .sort((left, right) => {
+      if (right.score !== left.score) {
+        return right.score - left.score;
+      }
+
+      return right.board.totalSealAmount - left.board.totalSealAmount;
+    })
+    .slice(0, 3);
+}
+
+function buildMarketSimpleQuestionInsight({
+  strongestBoard,
+  limitUpStocks,
+  totalOpenBoardCount,
+  consecutiveBoardCount
+}: {
+  strongestBoard: LimitUpBoardSummary | null;
+  limitUpStocks: LimitUpStock[];
+  totalOpenBoardCount: number;
+  consecutiveBoardCount: number;
+}): SimpleQuestionInsight {
+  const boardStockCount = strongestBoard?.stocks.length ?? 0;
+  const openPressure = limitUpStocks.length ? totalOpenBoardCount / limitUpStocks.length : 0;
+  const hasBreadth = boardStockCount >= 5;
+  const hasTrend = Boolean(strongestBoard && strongestBoard.maxBoardHeight >= 2 && consecutiveBoardCount >= 2);
+  const hasChainSpread = Boolean(
+    strongestBoard &&
+      strongestBoard.stocks.filter((stock) => stock.consecutiveBoardCount >= 1).length >= 3
+  );
+  const hasAcceptance = Boolean(strongestBoard && openPressure <= 1.6);
+  const passedCount = [hasBreadth, hasTrend, hasChainSpread, hasAcceptance].filter(Boolean).length;
+
+  return {
+    verdict:
+      passedCount >= 3
+        ? "有简单题"
+        : passedCount === 2
+          ? "半简单题"
+          : "暂无简单题",
+    summary: strongestBoard
+      ? `${strongestBoard.name} 当前是最强主线候选。简单题不是猜涨停，而是看成交、趋势、产业链扩散和回踩承接是否站到同一边。`
+      : "当前还没有明确主线，先不急着给自己出难题。",
+    action:
+      passedCount >= 3
+        ? "只在主线前排里做选择，不去轮动题材里反复横跳。"
+        : passedCount === 2
+          ? "可以观察，但必须等更多信号确认，不追单日涨幅。"
+          : "先看不买，等市场把答案写清楚。",
+    signals: [
+      {
+        name: "产业链扩散",
+        status: hasBreadth ? "passed" : "pending",
+        text: strongestBoard
+          ? `${strongestBoard.name} 涨停 ${boardStockCount} 家，${hasBreadth ? "已经不是单点上涨" : "扩散还不够"}。`
+          : "等待板块涨停家数。"
+      },
+      {
+        name: "趋势确认",
+        status: hasTrend ? "passed" : "pending",
+        text: strongestBoard
+          ? `连板 ${consecutiveBoardCount} 家，高度 ${strongestBoard.maxBoardHeight} 板，${hasTrend ? "趋势有延续" : "持续性还要确认"}。`
+          : "等待连板和高度数据。"
+      },
+      {
+        name: "前排梯队",
+        status: hasChainSpread ? "passed" : "pending",
+        text: strongestBoard
+          ? `${hasChainSpread ? "板块内有多只前排共同表现" : "前排梯队还不够厚"}，避免只看单票强。`
+          : "等待前排梯队。"
+      },
+      {
+        name: "回踩承接",
+        status: hasAcceptance ? "passed" : "failed",
+        text: `平均开板压力约 ${openPressure.toFixed(1)} 次，${hasAcceptance ? "资金没有明显快速消失" : "分歧压力偏高"}。`
+      }
+    ]
+  };
+}
+
+function buildHoldingThemeMatches(
+  holdings: Holding[],
+  boardInsights: InvestableBoardInsight[],
+  limitUpStocks: LimitUpStock[]
+): HoldingThemeMatch[] {
+  const topBoardNames = boardInsights.map((item) => item.name);
+  const limitUpByCode = new Map(limitUpStocks.map((stock) => [stock.code, stock]));
+
+  return holdings.map((holding) => {
+    const limitUpStock = limitUpByCode.get(holding.code);
+    const text = [holding.thesis, ...holding.tags].join(" ");
+    const matchedBoard =
+      limitUpStock?.industry ??
+      topBoardNames.find((boardName) => text.includes(boardName)) ??
+      "";
+    const isTopBoard = Boolean(matchedBoard && topBoardNames.includes(matchedBoard));
+
+    if (limitUpStock && isTopBoard) {
+      return {
+        holding,
+        relation: "主线相关",
+        matchedBoard,
+        action: "优先跟踪，按纪律决定是否加减仓",
+        reason: `${holding.name} 已进入涨停池，且属于今日 Top 3 板块 ${matchedBoard}。重点看封单、开板和次日承接。`
+      };
+    }
+
+    if (limitUpStock) {
+      return {
+        holding,
+        relation: "部分相关",
+        matchedBoard: limitUpStock.industry,
+        action: "持有观察，不因单票涨停盲目加仓",
+        reason: `${holding.name} 在涨停池内，但所属板块暂未进入今日 Top 3。先看它能否带动板块，而不是只看单票。`
+      };
+    }
+
+    if (matchedBoard) {
+      return {
+        holding,
+        relation: isTopBoard ? "部分相关" : "暂无关联",
+        matchedBoard,
+        action: isTopBoard ? "观察是否被主线带动" : "不因今日主线随意调整",
+        reason: isTopBoard
+          ? `${holding.name} 的持仓逻辑提到 ${matchedBoard}，但个股未进入涨停池。适合观察主线外溢，不适合追涨补仓。`
+          : `${holding.name} 当前没有进入涨停池，和今日 Top 3 主线暂无直接联动。`
+      };
+    }
+
+    return {
+      holding,
+      relation: "暂无关联",
+      matchedBoard: "未匹配",
+      action: "按原计划执行，不被盘面热点干扰",
+      reason: `${holding.name} 暂未匹配今日 Top 3 板块，也未进入涨停池。优先检查原持仓逻辑和止损纪律。`
+    };
+  });
+}
+
+function extractThemeTags(
+  detail: StockDetail | null,
+  limitUpStock: LimitUpStock | null,
+  relatedBoard: LimitUpBoardSummary | null,
+  boardName: string | null
+) {
+  const rawTags = [
+    boardName,
+    relatedBoard?.name,
+    detail?.industry,
+    limitUpStock?.industry,
+    ...(limitUpStock?.reason
+      .split(/[、，,；;。.\s]+/)
+      .map((item) => item.trim())
+      .filter((item) => item.length >= 2 && !item.includes("方向") && !item.includes("涨停")) ?? [])
+  ];
+
+  return Array.from(new Set(rawTags.filter(Boolean) as string[])).slice(0, 5);
+}
+
+function buildStockBackgroundInsight(
+  detail: StockDetail | null,
+  limitUpStock: LimitUpStock | null,
+  relatedBoard: LimitUpBoardSummary | null,
+  boardName: string | null
+): StockBackgroundInsight {
+  const name = detail?.name ?? limitUpStock?.name ?? "当前股票";
+  const code = detail?.code ?? limitUpStock?.code ?? "";
+  const resolvedBoard = boardName ?? relatedBoard?.name ?? detail?.industry ?? limitUpStock?.industry ?? "待识别";
+  const themeTags = extractThemeTags(detail, limitUpStock, relatedBoard, boardName);
+  const relatedRank = relatedBoard?.stocks.findIndex((stock) => stock.code === code) ?? -1;
+  const frontRankText = relatedRank >= 0 ? `板块涨停池第 ${relatedRank + 1} 位` : "暂未进入当前板块涨停池前排";
+
+  return {
+    title: `${name}${code ? ` ${code}` : ""}`,
+    subtitle: `${resolvedBoard} · ${limitUpStock?.ladderType ?? "非涨停池"} · ${limitUpStock ? `${limitUpStock.consecutiveBoardCount} 板` : "待确认强度"}`,
+    themeTags: themeTags.length > 0 ? themeTags : ["题材待补齐"],
+    companyContext:
+      detail && detail.industry !== "未知行业"
+        ? `${name} 当前按行情数据归入 ${detail.industry}。这里先把它当作 ${resolvedBoard} 方向里的候选标的观察。`
+        : `${name} 的实时行业/主营资料暂不完整，当前只能先用名称、代码、所选板块和涨停池关系做背景判断。`,
+    themeContext: relatedBoard
+      ? `${resolvedBoard} 今日有 ${relatedBoard.stocks.length} 家涨停，连板 ${relatedBoard.consecutiveBoardCount} 家，高度 ${relatedBoard.maxBoardHeight} 板，是判断这只股票题材强弱的主要参照。`
+      : `${resolvedBoard} 的板块联动数据暂不完整，不能单独因为个股波动就认定它是主线。`,
+    boardPosition: limitUpStock
+      ? `${frontRankText}，首次涨停 ${limitUpStock.firstLimitUpTime}，开板 ${limitUpStock.openBoardCount} 次，封单 ${limitUpStock.sealAmount}，封单强度 ${limitUpStock.sealStrength}。`
+      : `${frontRankText}，说明它当前不是涨停池里最明确的前排标的，需要和同题材强势股比较后再判断。`,
+    catalyst: limitUpStock?.reason ?? "暂未命中涨停池原因描述，题材催化需要继续补充公告、新闻或研报材料。",
+    compare: relatedBoard
+      ? `同题材优先比较 ${relatedBoard.stocks
+          .filter((stock) => stock.code !== code)
+          .slice(0, 3)
+          .map((stock) => `${stock.name} ${stock.code}`)
+          .join("、") || "板块内其它前排股"}。如果它弱于前排，就不应该只因为熟悉这只票而买。`
+      : "同题材对比对象暂缺，先回到首页或板块页找前排，再决定它是否值得进入交易计划。",
+    dataGap: detail?.price && detail.price > 0
+      ? "实时行情已接入，可以继续结合成交额、换手率和分时承接判断买点。"
+      : "实时行情明细暂不可用，背景介绍可用，但不能直接形成买入结论。"
+  };
+}
+
+function buildStockSimpleQuestionInsight(
+  detail: StockDetail | null,
+  limitUpStock: LimitUpStock | null,
+  relatedBoard: LimitUpBoardSummary | null
+): SimpleQuestionInsight {
+  const stockName = detail?.name ?? limitUpStock?.name ?? "这只股票";
+  const boardName = relatedBoard?.name ?? detail?.industry ?? limitUpStock?.industry ?? "待识别板块";
+  const hasBoardAnswer = Boolean(relatedBoard && relatedBoard.stocks.length >= 5);
+  const hasTrendAnswer = Boolean(
+    limitUpStock
+      ? limitUpStock.consecutiveBoardCount >= 2 || limitUpStock.firstLimitUpTime <= "10:00"
+      : detail && detail.changePercent >= 5
+  );
+  const hasChainAnswer = Boolean(
+    relatedBoard &&
+      relatedBoard.stocks.filter((stock) => stock.consecutiveBoardCount >= 1).length >= 3
+  );
+  const hasAcceptanceAnswer = Boolean(
+    limitUpStock
+      ? limitUpStock.openBoardCount <= 1
+      : detail && detail.amount >= 500_000_000 && detail.turnoverRate <= 18
+  );
+  const passedCount = [hasBoardAnswer, hasTrendAnswer, hasChainAnswer, hasAcceptanceAnswer].filter(Boolean).length;
+
+  return {
+    verdict:
+      passedCount >= 3
+        ? "简单题候选"
+        : passedCount === 2
+          ? "需要确认"
+          : "不是简单题",
+    summary:
+      passedCount >= 3
+        ? `${stockName} 当前更像 ${boardName} 主线里的前排题，不是孤立单票。`
+        : `${stockName} 还没有同时满足主线、趋势、产业链扩散和承接，不能把它当简单题。`,
+    action:
+      passedCount >= 3
+        ? "只等纪律买点，不临盘追高。"
+        : "先做比较和记录，不急着交易。",
+    signals: [
+      {
+        name: "不是单票强",
+        status: hasBoardAnswer ? "passed" : "pending",
+        text: relatedBoard
+          ? `${boardName} 有 ${relatedBoard.stocks.length} 家涨停，${hasBoardAnswer ? "有板块支撑" : "板块扩散不足"}。`
+          : "缺少相关板块数据。"
+      },
+      {
+        name: "趋势已走出",
+        status: hasTrendAnswer ? "passed" : "pending",
+        text: limitUpStock
+          ? `${limitUpStock.ladderType}，首次涨停 ${limitUpStock.firstLimitUpTime}，${hasTrendAnswer ? "有前排迹象" : "趋势还不够明确"}。`
+          : "未命中涨停池，需要用分时和趋势补充确认。"
+      },
+      {
+        name: "产业链扩散",
+        status: hasChainAnswer ? "passed" : "pending",
+        text: relatedBoard
+          ? `${hasChainAnswer ? "同板块多只股票共同表现" : "同题材梯队还不厚"}，不能只看单日涨幅。`
+          : "同题材比较对象不足。"
+      },
+      {
+        name: "资金承接",
+        status: hasAcceptanceAnswer ? "passed" : "pending",
+        text: limitUpStock
+          ? `开板 ${limitUpStock.openBoardCount} 次，封单 ${limitUpStock.sealAmount}，${hasAcceptanceAnswer ? "承接暂可" : "分歧偏大"}。`
+          : "缺少成交额、换手率和分时承接，不能判断买点。"
+      }
+    ]
+  };
+}
+
+function buildStockDecisionInsight(
+  detail: StockDetail | null,
+  limitUpStock: LimitUpStock | null,
+  relatedBoard: LimitUpBoardSummary | null
+): StockDecisionInsight {
+  if (!detail) {
+    return {
+      verdict: "等待数据",
+      action: "先不决策",
+      position: "不加仓",
+      reason: "当前还没有取到个股实时行情，不能给出有效判断。",
+      risk: "缺少价格、成交额、换手率和板块位置。",
+      nextStep: "先确认股票代码是否正确，等待行情数据恢复后再判断。"
+    };
+  }
+
+  if (detail.price <= 0) {
+    return {
+      verdict: "基础分析",
+      action: "先不交易",
+      position: "不新增仓",
+      reason: `${detail.name} 的实时行情暂不可用，当前只能基于股票代码、名称、板块和涨停池关系做初步判断。`,
+      risk: "缺少实时价格、成交额、换手率和分时走势，不能判断买点。",
+      nextStep: "等待行情恢复，或从首页 Top 3 板块进入有完整数据的前排个股。"
+    };
+  }
+
+  const boardStrength = relatedBoard
+    ? relatedBoard.stocks.length + relatedBoard.consecutiveBoardCount * 2 + relatedBoard.maxBoardHeight
+    : 0;
+  const isBoardStrong = boardStrength >= 10;
+  const isExtended = detail.changePercent >= 8 || (limitUpStock?.consecutiveBoardCount ?? 0) >= 3;
+  const hasHeavyTurnover = detail.turnoverRate >= 18;
+  const hasGoodLiquidity = detail.amount >= 500_000_000;
+
+  if (limitUpStock && isBoardStrong && !isExtended && limitUpStock.openBoardCount <= 1) {
+    return {
+      verdict: "前排可观察",
+      action: "只按计划低吸或次日确认",
+      position: "试错仓",
+      reason: `${detail.name} 命中涨停池，所属板块有 ${relatedBoard?.stocks.length ?? 0} 家涨停，开板次数 ${limitUpStock.openBoardCount} 次，仍有板块支撑。`,
+      risk: "涨停后直接追高的性价比不高，必须等换手和承接确认。",
+      nextStep: "记录入场条件：回踩不破关键均价、板块前排继续封住、指数不明显转弱。"
+    };
+  }
+
+  if (limitUpStock && (isExtended || limitUpStock.openBoardCount >= 2)) {
+    return {
+      verdict: "不适合追高",
+      action: "观察，不追",
+      position: "不新增仓",
+      reason: `${detail.name} 已在强势位置，${limitUpStock.consecutiveBoardCount} 板，开板 ${limitUpStock.openBoardCount} 次，追高容易承担分歧风险。`,
+      risk: "高位一致性或反复开板后，次日承接不确定。",
+      nextStep: "只看板块是否继续扩散；若已有持仓，按止盈和开板纪律处理。"
+    };
+  }
+
+  if (relatedBoard && isBoardStrong && hasGoodLiquidity) {
+    return {
+      verdict: "板块内观察",
+      action: "等确认，不抢先手",
+      position: "观察仓或不动",
+      reason: `${detail.name} 属于 ${relatedBoard.name}，板块有 ${relatedBoard.stocks.length} 家涨停，但个股未进入涨停池，需要确认是否能跟随主线。`,
+      risk: hasHeavyTurnover ? "换手较高，资金分歧偏大。" : "未进入涨停池，辨识度弱于前排。",
+      nextStep: "和同板块前排比较：强度不足就放弃，只有放量向上且板块继续加强才考虑。"
+    };
+  }
+
+  return {
+    verdict: "暂无交易优势",
+    action: "不主动买入",
+    position: "空仓观察",
+    reason: `${detail.name} 当前没有明显涨停池或强板块位置优势，交易依据不足。`,
+    risk: "容易被单只股票波动吸引，偏离今日主线和自己的交易纪律。",
+    nextStep: "回到首页先确认今日 Top 3 板块，再决定这只股票是否值得继续跟踪。"
+  };
 }
 
 function totalCostValue(items: Holding[]) {
@@ -685,14 +1304,57 @@ function buildUploadAssetFromFile(file: File, source: UploadAsset["source"] = "f
   };
 }
 
-function buildHoldingAiActions(items: Holding[]): HoldingAiAction[] {
+function buildHoldingAiActions(
+  items: Holding[],
+  limitUpStocks: LimitUpStock[] = [],
+  boards: LimitUpBoardSummary[] = []
+): HoldingAiAction[] {
   const portfolioMarketValue = totalMarketValue(items);
+  const topBoards = boards.slice(0, 3);
+  const topBoardNames = topBoards.map((board) => board.name);
+  const limitUpByCode = new Map(limitUpStocks.map((stock) => [stock.code, stock]));
 
   return items.map((item) => {
     const weight = holdingWeightPercent(item, portfolioMarketValue);
     const pnlPercent = ((item.price - item.cost) / item.cost) * 100;
     const targetGap = typeof item.targetPrice === "number" ? ((item.targetPrice - item.price) / item.price) * 100 : null;
     const stopGap = typeof item.stopLoss === "number" ? ((item.price - item.stopLoss) / item.price) * 100 : null;
+    const limitUpStock = limitUpByCode.get(item.code) ?? null;
+    const matchedTopBoard =
+      limitUpStock && topBoardNames.includes(limitUpStock.industry)
+        ? limitUpStock.industry
+        : item.tags.find((tag) => topBoardNames.includes(tag)) ?? null;
+    const partialBoard =
+      limitUpStock?.industry ??
+      item.tags.find((tag) => boards.some((board) => board.name === tag)) ??
+      null;
+    const themeRelation = matchedTopBoard
+      ? `今日主线相关：${matchedTopBoard}`
+      : partialBoard
+        ? `部分相关：${partialBoard}`
+        : "今日主线无关";
+    const holdingState =
+      pnlPercent >= 10
+        ? `盈利持仓，浮盈 ${percent(pnlPercent)}`
+        : pnlPercent <= -8
+          ? `亏损持仓，浮亏 ${Math.abs(pnlPercent).toFixed(2)}%`
+          : `震荡持仓，收益 ${percent(pnlPercent)}`;
+    const riskPosition =
+      stopGap !== null
+        ? stopGap < 0
+          ? `已跌破止损 ${Math.abs(stopGap).toFixed(1)}%，防守失效`
+          : stopGap <= 5
+          ? `距离止损 ${stopGap.toFixed(1)}%，防守很近`
+          : `距离止损 ${stopGap.toFixed(1)}%，仍有缓冲`
+        : "未设置止损，风险边界不清";
+    const targetPosition =
+      targetGap !== null
+        ? targetGap < 0
+          ? `已超过目标 ${Math.abs(targetGap).toFixed(1)}%，进入兑现区`
+          : targetGap <= 5
+          ? `距离目标 ${targetGap.toFixed(1)}%，接近兑现区`
+          : `距离目标 ${targetGap.toFixed(1)}%，仍有空间`
+        : "未设置目标价，止盈边界不清";
     let score = 68;
 
     let action = "继续持有";
@@ -700,6 +1362,7 @@ function buildHoldingAiActions(items: Holding[]): HoldingAiAction[] {
     let priority = "中优先级";
     let positionAdvice = "维持当前仓位";
     let executionRatio = "0%";
+    let disciplineAction = "今日不动";
     let reason = "当前盈亏和波动处于可控区间，暂不需要激进调仓。";
     let nextStep = "继续观察量价配合、板块资金承接和目标价兑现节奏。";
     let expectation = "预期未来 1 到 3 周以震荡上行为主，适合边走边看。";
@@ -710,6 +1373,7 @@ function buildHoldingAiActions(items: Holding[]): HoldingAiAction[] {
       priority = "最高优先级";
       positionAdvice = "快速降仓";
       executionRatio = "50% - 100%";
+      disciplineAction = "到价止损";
       score = 28;
       reason = `现价已接近止损位，说明成本防守已经失效，再拖会放大回撤。`;
       nextStep = "优先减掉一半以上仓位，若次日无法快速收回止损线，则执行清仓。";
@@ -720,6 +1384,7 @@ function buildHoldingAiActions(items: Holding[]): HoldingAiAction[] {
       priority = "高优先级";
       positionAdvice = "兑现部分利润";
       executionRatio = "20% - 30%";
+      disciplineAction = "分批止盈";
       score = 74;
       reason = "已有较厚浮盈，且距离目标价不远，继续死扛的赔率开始下降。";
       nextStep = "先兑现 20% 到 30% 仓位，把利润锁住，剩余仓位跟踪趋势。";
@@ -730,6 +1395,7 @@ function buildHoldingAiActions(items: Holding[]): HoldingAiAction[] {
       priority = "高优先级";
       positionAdvice = "降到中性仓位";
       executionRatio = "20% - 40%";
+      disciplineAction = "降低风险";
       score = 42;
       reason = "这类亏损幅度叠加较高仓位，会拖累组合修复速度。";
       nextStep = "先把仓位降到组合中性水平，再等量能修复和板块回流确认。";
@@ -740,6 +1406,7 @@ function buildHoldingAiActions(items: Holding[]): HoldingAiAction[] {
       priority = "中优先级";
       positionAdvice = weight >= 25 ? "持有不追高" : "可小幅顺势加仓";
       executionRatio = weight >= 25 ? "0%" : "5% - 10%";
+      disciplineAction = weight >= 25 ? "持仓不动" : "顺势小加";
       score = 85;
       reason = "价格、浮盈和当日强度同向，说明市场资金仍在强化这笔交易。";
       nextStep = "不追高加仓，重点盯住量能是否继续放大，以及回撤是否守住 5 日节奏。";
@@ -750,27 +1417,43 @@ function buildHoldingAiActions(items: Holding[]): HoldingAiAction[] {
       priority = "中优先级";
       positionAdvice = "保留仓位等待趋势";
       executionRatio = "0% - 10%";
+      disciplineAction = "观察持有";
       score = 72;
       reason = "离目标价仍有一段安全收益空间，现阶段更适合给趋势时间。";
       nextStep = "围绕成本附近做防守，若出现放量突破可再小幅顺势加仓。";
       expectation = "后续以趋势修复和估值回归为主，节奏不会特别快。";
     }
 
+    if (matchedTopBoard && action === "继续持有") {
+      score += 8;
+      reason = `${reason} 同时它和今日主线 ${matchedTopBoard} 有直接关系，优先看板块承接而不是只看单票分时。`;
+      nextStep = `${nextStep} 若主线继续扩散且个股不破成本防守，可以继续持有。`;
+    } else if (!matchedTopBoard && action === "继续持有") {
+      score -= 6;
+      nextStep = `${nextStep} 由于暂不贴近今日 Top 3 主线，不因盘面热点临时加仓。`;
+    }
+
     if (weight >= 30 && action === "坚定持有") {
       positionAdvice = "只持有不加仓";
       executionRatio = "0%";
+      disciplineAction = "仓位过重不加";
       nextStep = "仓位已经偏重，不建议继续加码，重点做风控和利润保护。";
     }
 
     if (stopGap !== null && stopGap < 8 && action !== "减仓或止损") {
       priority = "高优先级";
+      disciplineAction = "盯止损线";
       nextStep = `${nextStep} 同时把止损执行放在首位，避免小亏拖成大亏。`;
     }
 
     if (weight <= 12 && score >= 80) {
       positionAdvice = "可试探性加仓";
       executionRatio = "5% - 8%";
+      disciplineAction = "小仓验证";
     }
+
+    score = Math.max(0, Math.min(100, score));
+    const thesisText = item.thesis.trim().replace(/[。.!！?？]+$/, "");
 
     return {
       code: item.code,
@@ -785,6 +1468,11 @@ function buildHoldingAiActions(items: Holding[]): HoldingAiAction[] {
         parseExecutionRatioMidpoint(executionRatio) > 0
           ? `${Math.max(100, Math.round((item.shares * parseExecutionRatioMidpoint(executionRatio)) / 100 / 100) * 100)} 股`
           : "暂不调整",
+      holdingState,
+      themeRelation,
+      disciplineAction,
+      riskPosition: `${riskPosition}；${targetPosition}；仓位 ${weight.toFixed(1)}%`,
+      reviewCheck: `${thesisText ? `买入逻辑：${thesisText}` : "买入逻辑未记录"}。明日验证：${matchedTopBoard ? "主线是否继续扩散、前排是否继续承接" : "原逻辑是否仍成立、是否被热点干扰"}。`,
       reason,
       nextStep,
       expectation
@@ -1069,6 +1757,7 @@ export default function App() {
   const [stockTrendPoints, setStockTrendPoints] = useState<StockTrendPoint[]>([]);
   const [stockTrendLoading, setStockTrendLoading] = useState(false);
   const [stockTrendError, setStockTrendError] = useState("");
+  const [decisionQueue, setDecisionQueue] = useState<DecisionQueueStock[]>([]);
   const [portfolioProfilesState, setPortfolioProfilesState] = useState<PortfolioProfile[]>(() =>
     loadPortfolioProfilesFromStorage()
   );
@@ -1088,6 +1777,11 @@ export default function App() {
   const [selectedReviewTradeId, setSelectedReviewTradeId] = useState<string | null>(null);
   const [reviewForm, setReviewForm] = useState<ReviewFormState>(emptyReviewForm);
   const [reviewFormError, setReviewFormError] = useState("");
+  const [disciplineRules, setDisciplineRules] = useState<DisciplineRule[]>(() =>
+    loadDisciplineRulesFromStorage()
+  );
+  const [disciplineForm, setDisciplineForm] = useState<DisciplineFormState>(emptyDisciplineForm);
+  const [disciplineFormError, setDisciplineFormError] = useState("");
   const activePortfolioProfile = useMemo(
     () =>
       portfolioProfilesState.find((profile) => profile.id === activePortfolioProfileId) ??
@@ -1102,13 +1796,7 @@ export default function App() {
   const pnl = marketValue - costValue;
   const pnlPercent = (pnl / costValue) * 100;
   const isEditablePortfolio = activePortfolioProfile?.id === "mine";
-  const holdingAiActions = useMemo(() => buildHoldingAiActions(portfolio), [portfolio]);
   const aiIdeas = useMemo(() => buildAiIdeas(portfolio), [portfolio]);
-  const portfolioAiRoadmap = useMemo(
-    () => buildPortfolioAiRoadmap(portfolio, holdingAiActions, activePortfolioCashEstimate),
-    [activePortfolioCashEstimate, holdingAiActions, portfolio]
-  );
-  const fundingPlans = useMemo(() => buildFundingPlans(holdingAiActions), [holdingAiActions]);
   const reviewedTrades = useMemo(
     () => activeTradeRecords.filter((trade) => trade.review),
     [activeTradeRecords]
@@ -1260,17 +1948,7 @@ export default function App() {
 
   const limitUpBoards = useMemo(() => {
     const grouped = limitUpStocks.reduce<
-      Record<
-        string,
-        {
-          name: string;
-          stocks: LimitUpStock[];
-          firstBoardCount: number;
-          consecutiveBoardCount: number;
-          maxBoardHeight: number;
-          totalSealAmount: number;
-        }
-      >
+      Record<string, LimitUpBoardSummary>
     >((acc, stock) => {
       const boardName = stock.industry || "未知行业";
       const numericSealAmount = Number.parseFloat(stock.sealAmount.replace("亿", "")) || 0;
@@ -1282,12 +1960,14 @@ export default function App() {
           firstBoardCount: 0,
           consecutiveBoardCount: 0,
           maxBoardHeight: 0,
-          totalSealAmount: 0
+          totalSealAmount: 0,
+          openBoardCount: 0
         };
       }
 
       acc[boardName].stocks.push(stock);
       acc[boardName].totalSealAmount += numericSealAmount;
+      acc[boardName].openBoardCount += stock.openBoardCount;
       acc[boardName].maxBoardHeight = Math.max(
         acc[boardName].maxBoardHeight,
         stock.consecutiveBoardCount
@@ -1314,6 +1994,41 @@ export default function App() {
       return b.totalSealAmount - a.totalSealAmount;
     });
   }, [limitUpStocks]);
+  const investableBoardInsights = useMemo(
+    () => buildInvestableBoardInsights(limitUpBoards),
+    [limitUpBoards]
+  );
+  const holdingAiActions = useMemo(
+    () => buildHoldingAiActions(portfolio, limitUpStocks, limitUpBoards),
+    [limitUpBoards, limitUpStocks, portfolio]
+  );
+  const portfolioAiRoadmap = useMemo(
+    () => buildPortfolioAiRoadmap(portfolio, holdingAiActions, activePortfolioCashEstimate),
+    [activePortfolioCashEstimate, holdingAiActions, portfolio]
+  );
+  const fundingPlans = useMemo(() => buildFundingPlans(holdingAiActions), [holdingAiActions]);
+  const holdingThemeMatches = useMemo(
+    () => buildHoldingThemeMatches(portfolio, investableBoardInsights, limitUpStocks),
+    [investableBoardInsights, limitUpStocks, portfolio]
+  );
+  const holdingThemeSummary = useMemo(() => {
+    const directCount = holdingThemeMatches.filter((item) => item.relation === "主线相关").length;
+    const partialCount = holdingThemeMatches.filter((item) => item.relation === "部分相关").length;
+
+    if (holdingThemeMatches.length === 0) {
+      return "当前还没有录入持仓，无法判断你的组合和今日主线的关系。";
+    }
+
+    if (directCount > 0) {
+      return `当前有 ${directCount} 只持仓直接贴近今日主线，优先按交易纪律处理这些仓位。`;
+    }
+
+    if (partialCount > 0) {
+      return `当前有 ${partialCount} 只持仓和今日主线存在弱关联，适合观察外溢，不适合随意追涨。`;
+    }
+
+    return "当前持仓与今日 Top 3 主线暂无明显关系，重点是守住原计划，不被热点干扰。";
+  }, [holdingThemeMatches]);
 
   const selectedLimitUpBoardData = useMemo(
     () => limitUpBoards.find((board) => board.name === selectedLimitUpBoard) ?? null,
@@ -1334,12 +2049,16 @@ export default function App() {
         : [],
     [limitUpSortDirection, limitUpSortField, selectedLimitUpBoardData]
   );
+  const visibleSelectedBoardStocks = useMemo(
+    () => sortedSelectedBoardStocks.slice(0, 20),
+    [sortedSelectedBoardStocks]
+  );
 
   const visibleLimitUpBoards = useMemo(() => limitUpBoards.slice(0, 4), [limitUpBoards]);
-  const topThemeBoards = useMemo(() => limitUpBoards.slice(0, 3), [limitUpBoards]);
+  const strongestThemeBoard = limitUpBoards[0] ?? null;
   const frontRunnerStocks = useMemo(
     () =>
-      [...limitUpStocks]
+      [...(strongestThemeBoard?.stocks ?? [])]
         .sort((left, right) => {
           if (right.consecutiveBoardCount !== left.consecutiveBoardCount) {
             return right.consecutiveBoardCount - left.consecutiveBoardCount;
@@ -1356,10 +2075,9 @@ export default function App() {
 
           return parseLimitUpTime(left.firstLimitUpTime) - parseLimitUpTime(right.firstLimitUpTime);
         })
-        .slice(0, 5),
-    [limitUpStocks]
+        .slice(0, 10),
+    [strongestThemeBoard?.stocks]
   );
-  const strongestThemeBoard = topThemeBoards[0] ?? null;
   const leadStock = frontRunnerStocks[0] ?? null;
   const backupStock = useMemo(() => {
     if (!leadStock) {
@@ -1382,6 +2100,36 @@ export default function App() {
 
     return limitUpBoards.find((board) => board.name === effectiveStockBoardName) ?? null;
   }, [effectiveStockBoardName, limitUpBoards]);
+  const selectedLimitUpStock = useMemo(
+    () => limitUpStocks.find((stock) => stock.code === selectedStockCode) ?? null,
+    [limitUpStocks, selectedStockCode]
+  );
+  const selectedDecisionQueueCodes = useMemo(
+    () => new Set(decisionQueue.map((stock) => stock.code)),
+    [decisionQueue]
+  );
+  const activeQueueIndex = useMemo(
+    () => decisionQueue.findIndex((stock) => stock.code === selectedStockCode),
+    [decisionQueue, selectedStockCode]
+  );
+  const stockBackgroundInsight = useMemo(
+    () =>
+      buildStockBackgroundInsight(
+        stockDetail,
+        selectedLimitUpStock,
+        relatedBoardData,
+        effectiveStockBoardName
+      ),
+    [effectiveStockBoardName, relatedBoardData, selectedLimitUpStock, stockDetail]
+  );
+  const stockSimpleQuestionInsight = useMemo(
+    () => buildStockSimpleQuestionInsight(stockDetail, selectedLimitUpStock, relatedBoardData),
+    [relatedBoardData, selectedLimitUpStock, stockDetail]
+  );
+  const stockDecisionInsight = useMemo(
+    () => buildStockDecisionInsight(stockDetail, selectedLimitUpStock, relatedBoardData),
+    [relatedBoardData, selectedLimitUpStock, stockDetail]
+  );
   const stockTrendStats = useMemo(() => {
     if (stockTrendPoints.length === 0) {
       return null;
@@ -1458,6 +2206,41 @@ export default function App() {
   const consecutiveBoardCount = limitUpStocks.filter(
     (stock) => stock.ladderType === "连板"
   ).length;
+  const intradayDecision = useMemo(
+    () =>
+      buildIntradayDecision({
+        indices: marketIndices,
+        limitUpStocks,
+        strongestTheme: strongestThemeBoard?.name ?? null,
+        leadStock,
+        backupStock,
+        totalOpenBoardCount,
+        maxLimitUpHeight,
+        firstBoardCount,
+        consecutiveBoardCount
+      }),
+    [
+      backupStock,
+      consecutiveBoardCount,
+      firstBoardCount,
+      leadStock,
+      limitUpStocks,
+      marketIndices,
+      maxLimitUpHeight,
+      strongestThemeBoard?.name,
+      totalOpenBoardCount
+    ]
+  );
+  const marketSimpleQuestionInsight = useMemo(
+    () =>
+      buildMarketSimpleQuestionInsight({
+        strongestBoard: strongestThemeBoard,
+        limitUpStocks,
+        totalOpenBoardCount,
+        consecutiveBoardCount
+      }),
+    [consecutiveBoardCount, limitUpStocks, strongestThemeBoard, totalOpenBoardCount]
+  );
   const uploadedVideos = useMemo(
     () => uploadAssets.filter((asset) => asset.kind === "视频" && asset.objectUrl),
     [uploadAssets]
@@ -1720,6 +2503,41 @@ export default function App() {
     setReviewFormError("");
   }
 
+  function handleDisciplineFormChange(
+    event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) {
+    const { name, value } = event.target;
+    setDisciplineForm((current) => ({ ...current, [name]: value }));
+  }
+
+  function handleDisciplineSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!disciplineForm.name.trim() || !disciplineForm.entryRule.trim() || !disciplineForm.exitRule.trim()) {
+      setDisciplineFormError("请至少填写模式名称、入场条件和退出条件。");
+      return;
+    }
+
+    setDisciplineRules((current) => [
+      {
+        id: `discipline-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        name: disciplineForm.name.trim(),
+        entryRule: disciplineForm.entryRule.trim(),
+        exitRule: disciplineForm.exitRule.trim(),
+        positionRule: disciplineForm.positionRule.trim() || "未设置仓位规则",
+        forbiddenRule: disciplineForm.forbiddenRule.trim() || "未设置禁做项",
+        createdAt: new Date().toISOString()
+      },
+      ...current
+    ]);
+    setDisciplineForm(emptyDisciplineForm);
+    setDisciplineFormError("");
+  }
+
+  function handleDeleteDisciplineRule(id: string) {
+    setDisciplineRules((current) => current.filter((rule) => rule.id !== id));
+  }
+
   useEffect(() => {
     closeHoldingEditor();
     setIsTradeEditorOpen(false);
@@ -1741,6 +2559,10 @@ export default function App() {
       activePortfolioProfileId
     );
   }, [activePortfolioProfileId]);
+
+  useEffect(() => {
+    window.localStorage.setItem(disciplineRulesStorageKey, JSON.stringify(disciplineRules));
+  }, [disciplineRules]);
 
   useEffect(() => {
     let disposed = false;
@@ -1999,7 +2821,11 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (activeHomeSubpage !== "stock" || !selectedStockCode) {
+    const shouldLoadStock = Boolean(
+      selectedStockCode && (activeNav === "policy" || activeHomeSubpage === "stock")
+    );
+
+    if (!shouldLoadStock || !selectedStockCode) {
       return;
     }
 
@@ -2032,7 +2858,37 @@ export default function App() {
           return;
         }
 
-        setStockDetailError(error instanceof Error ? error.message : "个股详情获取失败。");
+        try {
+          const fallbackMatch = await fetchStockSearchMatch(selectedStockCode);
+
+          if (disposed) {
+            return;
+          }
+
+          setStockDetail(
+            buildFallbackStockDetail(
+              fallbackMatch.code,
+              fallbackMatch.name,
+              selectedStockBoardName
+            )
+          );
+          setStockDetailUpdatedAt(
+            new Intl.DateTimeFormat("zh-CN", {
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+              hour12: false
+            }).format(new Date())
+          );
+          setStockDetailError("实时行情暂不可用，已使用基础股票信息生成分析。");
+        } catch {
+          if (disposed) {
+            return;
+          }
+
+          setStockDetail(null);
+          setStockDetailError(error instanceof Error ? error.message : "个股详情获取失败。");
+        }
       } finally {
         if (!disposed) {
           setStockDetailLoading(false);
@@ -2045,10 +2901,14 @@ export default function App() {
     return () => {
       disposed = true;
     };
-  }, [activeHomeSubpage, selectedStockBoardName, selectedStockCode]);
+  }, [activeHomeSubpage, activeNav, selectedStockBoardName, selectedStockCode]);
 
   useEffect(() => {
-    if (activeHomeSubpage !== "stock" || !selectedStockCode) {
+    const shouldLoadStock = Boolean(
+      selectedStockCode && (activeNav === "policy" || activeHomeSubpage === "stock")
+    );
+
+    if (!shouldLoadStock || !selectedStockCode) {
       return;
     }
 
@@ -2083,7 +2943,7 @@ export default function App() {
     return () => {
       disposed = true;
     };
-  }, [activeHomeSubpage, selectedStockCode, stockTrendRange]);
+  }, [activeHomeSubpage, activeNav, selectedStockCode, stockTrendRange]);
 
   function updateHash(
     nextNav: NavKey,
@@ -2134,6 +2994,48 @@ export default function App() {
     setSelectedStockCode(code);
     setSelectedStockBoardName(boardName);
     updateHash("policy", "overview", boardName, code, boardName);
+  }
+
+  function toggleDecisionQueueStock(stock: LimitUpStock, boardName: string | null) {
+    setDecisionQueue((current) => {
+      if (current.some((item) => item.code === stock.code)) {
+        return current.filter((item) => item.code !== stock.code);
+      }
+
+      return [
+        ...current,
+        {
+          code: stock.code,
+          name: stock.name,
+          boardName
+        }
+      ];
+    });
+  }
+
+  function addDecisionQueueStocks(stocks: LimitUpStock[], boardName: string | null) {
+    setDecisionQueue((current) => {
+      const existingCodes = new Set(current.map((item) => item.code));
+      const nextItems = stocks
+        .filter((stock) => !existingCodes.has(stock.code))
+        .map((stock) => ({
+          code: stock.code,
+          name: stock.name,
+          boardName
+        }));
+
+      return [...current, ...nextItems];
+    });
+  }
+
+  function openDecisionQueue() {
+    const firstStock = decisionQueue[0];
+
+    if (!firstStock) {
+      return;
+    }
+
+    navigateStockDetail(firstStock.code, firstStock.boardName);
   }
 
   async function handleDecisionSearch() {
@@ -2433,6 +3335,107 @@ export default function App() {
             </section>
 
             <section className="dashboard-grid">
+              <article className="card full-span intraday-decision-card">
+                <div className="card-head">
+                  <div>
+                    <p className="section-kicker">Decision Layer</p>
+                    <h2>盘中交易决策</h2>
+                  </div>
+                  <span className={`decision-status ${intradayDecision.tradeStatus}`}>
+                    {intradayDecision.tradeStatus}
+                  </span>
+                </div>
+                <p className="decision-summary">{intradayDecision.summary}</p>
+                <div className="decision-grid">
+                  <div className="decision-tile">
+                    <span>仓位建议</span>
+                    <strong>{intradayDecision.positionAdvice}</strong>
+                  </div>
+                  <div className="decision-tile">
+                    <span>最强主线</span>
+                    <strong>{intradayDecision.strongestTheme}</strong>
+                  </div>
+                  <div className="decision-tile">
+                    <span>龙头状态</span>
+                    <strong>{intradayDecision.leaderStatus}</strong>
+                  </div>
+                  <div className="decision-tile">
+                    <span>风险提醒</span>
+                    <strong>{intradayDecision.riskText}</strong>
+                  </div>
+                </div>
+                <div className="simple-question-panel">
+                  <div className="simple-question-head">
+                    <div>
+                      <p className="section-kicker">Simple Question</p>
+                      <h3>今天有没有简单题</h3>
+                    </div>
+                    <strong>{marketSimpleQuestionInsight.verdict}</strong>
+                  </div>
+                  <p>{marketSimpleQuestionInsight.summary}</p>
+                  <div className="simple-signal-grid">
+                    {marketSimpleQuestionInsight.signals.map((signal) => (
+                      <div key={signal.name} className={`simple-signal ${signal.status}`}>
+                        <span>{signal.name}</span>
+                        <strong>
+                          {signal.status === "passed"
+                            ? "已验证"
+                            : signal.status === "failed"
+                              ? "有风险"
+                              : "待确认"}
+                        </strong>
+                        <p>{signal.text}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <p><strong>执行：</strong>{marketSimpleQuestionInsight.action}</p>
+                </div>
+              </article>
+            </section>
+
+            <section className="dashboard-grid">
+              <article className="card full-span">
+                <div className="card-head">
+                  <div>
+                    <p className="section-kicker">AI Board Picks</p>
+                    <h2>今日最具投资属性的 3 个板块</h2>
+                    <p className="market-strip-meta">
+                      按涨停家数、连板高度、封单合计、开板压力和前排质量综合排序。
+                    </p>
+                  </div>
+                </div>
+                <div className="investable-board-grid">
+                  {investableBoardInsights.map((item, index) => (
+                    <button
+                      key={item.name}
+                      type="button"
+                      className="investable-board-card"
+                      onClick={() => navigateHomeSubpage("boards", item.name)}
+                    >
+                      <div className="investable-board-head">
+                        <span>#{index + 1}</span>
+                        <strong>{item.name}</strong>
+                        <small>{item.stance}</small>
+                      </div>
+                      <div className="investable-score">
+                        <strong>{item.score}</strong>
+                        <span>投资属性分</span>
+                      </div>
+                      <p>{item.reason}</p>
+                      <p><strong>风险：</strong>{item.risk}</p>
+                    </button>
+                  ))}
+                  {!limitUpLoading && investableBoardInsights.length === 0 && (
+                    <div className="placeholder-card">
+                      <strong>暂无可评分板块</strong>
+                      <p>当前还没有足够的涨停池数据来判断板块投资属性。</p>
+                    </div>
+                  )}
+                </div>
+              </article>
+            </section>
+
+            <section className="dashboard-grid">
               <article className="card full-span">
                 <div className="card-head">
                   <div>
@@ -2476,58 +3479,118 @@ export default function App() {
               <article className="card full-span">
                 <div className="card-head">
                   <div>
-                    <p className="section-kicker">Focus First</p>
-                    <h2>先看这 3 个方向</h2>
+                    <p className="section-kicker">Strongest Board</p>
+                    <h2>
+                      {strongestThemeBoard
+                        ? `${strongestThemeBoard.name} · 前 10 个股`
+                        : "最强板块前 10"}
+                    </h2>
+                    <p className="market-strip-meta">
+                      {strongestThemeBoard
+                        ? `板块涨停 ${strongestThemeBoard.stocks.length} 家，连板 ${strongestThemeBoard.consecutiveBoardCount} 家，首板 ${strongestThemeBoard.firstBoardCount} 家，高度 ${strongestThemeBoard.maxBoardHeight} 板。`
+                        : "等待最强板块数据。"}
+                    </p>
                   </div>
-                </div>
-                <div className="generated-grid">
-                  {topThemeBoards.map((board, index) => (
-                    <button
-                      key={board.name}
-                      type="button"
-                      className="placeholder-card limitup-board-card"
-                      onClick={() => {
-                        navigateHomeSubpage("boards", board.name);
-                      }}
-                    >
-                      <span className="structure-role">{`方向 ${index + 1}`}</span>
-                      <strong>{board.name}</strong>
-                      <p>{`板块内 ${board.stocks.length} 家涨停，连板 ${board.consecutiveBoardCount} 家，首板 ${board.firstBoardCount} 家，当前高度 ${board.maxBoardHeight} 板。`}</p>
-                    </button>
-                  ))}
-                  {!limitUpLoading && topThemeBoards.length === 0 && (
-                    <div className="placeholder-card">
-                      <strong>暂无主线方向</strong>
-                      <p>当前还没有拿到可用的涨停池板块数据。</p>
+                  {strongestThemeBoard && (
+                    <div className="card-actions">
+                      <button
+                        type="button"
+                        className="secondary action-link"
+                        onClick={() => addDecisionQueueStocks(frontRunnerStocks, strongestThemeBoard.name)}
+                      >
+                        加入前 10
+                      </button>
+                      <button
+                        type="button"
+                        className="secondary action-link"
+                        onClick={() => navigateHomeSubpage("boards", strongestThemeBoard.name)}
+                      >
+                        查看板块
+                      </button>
                     </div>
                   )}
                 </div>
-              </article>
-
-              <article className="card full-span">
-                <div className="card-head">
-                  <div>
-                    <p className="section-kicker">Front Runners</p>
-                    <h2>前排候选股</h2>
+                {strongestThemeBoard && (
+                  <div className="limitup-summary-grid strongest-board-summary">
+                    <div className="limitup-summary-card">
+                      <span>涨停家数</span>
+                      <strong>{strongestThemeBoard.stocks.length} 家</strong>
+                    </div>
+                    <div className="limitup-summary-card">
+                      <span>连板家数</span>
+                      <strong>{strongestThemeBoard.consecutiveBoardCount} 家</strong>
+                    </div>
+                    <div className="limitup-summary-card">
+                      <span>开板次数</span>
+                      <strong>{strongestThemeBoard.openBoardCount} 次</strong>
+                    </div>
+                    <div className="limitup-summary-card">
+                      <span>板块高度</span>
+                      <strong>{strongestThemeBoard.maxBoardHeight} 板</strong>
+                    </div>
                   </div>
-                </div>
-                <div className="generated-grid">
-                  {frontRunnerStocks.map((stock) => (
-                    <button
+                )}
+                {strongestThemeBoard && (
+                  <div className="decision-queue-bar">
+                    <span>已选 {decisionQueue.length} 只进入个股决策队列</span>
+                    <div className="decision-queue-actions">
+                      <button
+                        type="button"
+                        className="secondary action-link"
+                        disabled={decisionQueue.length === 0}
+                        onClick={openDecisionQueue}
+                      >
+                        一键进入决策
+                      </button>
+                      <button
+                        type="button"
+                        className="secondary action-link"
+                        disabled={decisionQueue.length === 0}
+                        onClick={() => setDecisionQueue([])}
+                      >
+                        清空
+                      </button>
+                    </div>
+                  </div>
+                )}
+                <div className="strongest-stock-list">
+                  {frontRunnerStocks.map((stock, index) => (
+                    <div
                       key={stock.code}
-                      type="button"
-                      className="placeholder-card limitup-board-card"
-                      onClick={() => navigateStockDetail(stock.code, stock.industry)}
+                      className="strongest-stock-row"
                     >
-                      <span className="structure-role">{`${stock.ladderType} · ${stock.industry}`}</span>
-                      <strong>{`${stock.name} ${stock.code}`}</strong>
-                      <p>{`${stock.reason}。封单 ${stock.sealAmount}，开板 ${stock.openBoardCount} 次，首次涨停 ${stock.firstLimitUpTime}。`}</p>
-                    </button>
+                      <label className="stock-select-control" aria-label={`选择 ${stock.name}`}>
+                        <input
+                          type="checkbox"
+                          checked={selectedDecisionQueueCodes.has(stock.code)}
+                          onChange={() =>
+                            toggleDecisionQueueStock(stock, strongestThemeBoard?.name ?? stock.industry)
+                          }
+                        />
+                      </label>
+                      <span className="strongest-stock-rank">{index + 1}</span>
+                      <span className="strongest-stock-name">
+                        <strong>{stock.name}</strong>
+                        <small>{stock.code}</small>
+                      </span>
+                      <span>{stock.ladderType}</span>
+                      <span>{stock.consecutiveBoardCount} 板</span>
+                      <span>封单 {stock.sealAmount}</span>
+                      <span>开板 {stock.openBoardCount} 次</span>
+                      <span>{stock.firstLimitUpTime}</span>
+                      <button
+                        type="button"
+                        className="secondary stock-row-action"
+                        onClick={() => navigateStockDetail(stock.code, strongestThemeBoard?.name ?? stock.industry)}
+                      >
+                        分析
+                      </button>
+                    </div>
                   ))}
                   {!limitUpLoading && frontRunnerStocks.length === 0 && (
                     <div className="placeholder-card">
-                      <strong>暂无前排候选股</strong>
-                      <p>当前没有可直接进入个股决策台的强势标的。</p>
+                      <strong>暂无最强板块前排股</strong>
+                      <p>当前没有可展示的最强板块前 10 个股。</p>
                     </div>
                   )}
                 </div>
@@ -2841,7 +3904,11 @@ export default function App() {
                   <p className="section-kicker">
                     {selectedLimitUpBoardData ? "Board Detail" : "All Boards"}
                   </p>
-                  <h2>{selectedLimitUpBoardData ? selectedLimitUpBoardData.name : "全部板块"}</h2>
+                  <h2>
+                    {selectedLimitUpBoardData
+                      ? `${selectedLimitUpBoardData.name} · 前 20 个股`
+                      : "全部板块"}
+                  </h2>
                 </div>
                 <button
                   type="button"
@@ -2862,7 +3929,7 @@ export default function App() {
               {selectedLimitUpBoardData ? (
                 <div className="limitup-table limitup-detail-page">
                   <p className="market-strip-meta">
-                    数据来源：东方财富涨停池 · {limitUpUpdatedAt} 更新
+                    数据来源：东方财富涨停池 · {limitUpUpdatedAt} 更新 · 当前按所选字段展示前 20
                   </p>
                   <div className="limitup-board-focus">
                     <div className="limitup-board-focus-card">
@@ -2882,8 +3949,39 @@ export default function App() {
                       <strong>{selectedLimitUpBoardData.firstBoardCount} 家</strong>
                     </div>
                   </div>
+                  <div className="decision-queue-bar">
+                    <span>已选 {decisionQueue.length} 只进入个股决策队列</span>
+                    <div className="decision-queue-actions">
+                      <button
+                        type="button"
+                        className="secondary action-link"
+                        onClick={() =>
+                          addDecisionQueueStocks(visibleSelectedBoardStocks, selectedLimitUpBoardData.name)
+                        }
+                      >
+                        加入前 20
+                      </button>
+                      <button
+                        type="button"
+                        className="secondary action-link"
+                        disabled={decisionQueue.length === 0}
+                        onClick={openDecisionQueue}
+                      >
+                        一键进入决策
+                      </button>
+                      <button
+                        type="button"
+                        className="secondary action-link"
+                        disabled={decisionQueue.length === 0}
+                        onClick={() => setDecisionQueue([])}
+                      >
+                        清空
+                      </button>
+                    </div>
+                  </div>
                   <div className="table-scroll">
                     <div className="limitup-head">
+                      <span className="select-column-label">选择</span>
                       <span>股票</span>
                       <SortableLimitUpHeader
                         label="价格"
@@ -2935,7 +4033,7 @@ export default function App() {
                         onToggle={handleLimitUpSort}
                       />
                     </div>
-                    {sortedSelectedBoardStocks.map((stock) => (
+                    {visibleSelectedBoardStocks.map((stock) => (
                       <div
                         className="limitup-row limitup-row-clickable"
                         key={stock.code}
@@ -2951,6 +4049,19 @@ export default function App() {
                           }
                         }}
                       >
+                        <label
+                          className="stock-select-control"
+                          aria-label={`选择 ${stock.name}`}
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedDecisionQueueCodes.has(stock.code)}
+                            onChange={() =>
+                              toggleDecisionQueueStock(stock, selectedLimitUpBoardData.name)
+                            }
+                          />
+                        </label>
                         <FieldValue
                           label="股票"
                           value={
@@ -3093,6 +4204,67 @@ export default function App() {
                     : `数据来源：东方财富实时个股行情 · ${stockDetailUpdatedAt} 更新`}
               </p>
 
+              {decisionQueue.length > 0 && (
+                <div className="decision-queue-panel">
+                  <div>
+                    <span className="section-kicker">Decision Queue</span>
+                    <strong>
+                      {activeQueueIndex >= 0
+                        ? `第 ${activeQueueIndex + 1} / ${decisionQueue.length} 只`
+                        : `队列 ${decisionQueue.length} 只`}
+                    </strong>
+                  </div>
+                  <div className="decision-queue-chips">
+                    {decisionQueue.map((stock) => (
+                      <button
+                        key={stock.code}
+                        type="button"
+                        className={`decision-queue-chip ${stock.code === selectedStockCode ? "active" : ""}`}
+                        onClick={() => navigateStockDetail(stock.code, stock.boardName)}
+                      >
+                        {stock.name}
+                        <span>{stock.code}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="decision-queue-actions">
+                    <button
+                      type="button"
+                      className="secondary action-link"
+                      disabled={activeQueueIndex <= 0}
+                      onClick={() => {
+                        const previousStock = decisionQueue[activeQueueIndex - 1];
+                        if (previousStock) {
+                          navigateStockDetail(previousStock.code, previousStock.boardName);
+                        }
+                      }}
+                    >
+                      上一只
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary action-link"
+                      disabled={activeQueueIndex < 0 || activeQueueIndex >= decisionQueue.length - 1}
+                      onClick={() => {
+                        const nextStock = decisionQueue[activeQueueIndex + 1];
+                        if (nextStock) {
+                          navigateStockDetail(nextStock.code, nextStock.boardName);
+                        }
+                      }}
+                    >
+                      下一只
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary action-link"
+                      onClick={() => setDecisionQueue([])}
+                    >
+                      清空队列
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {stockDetail ? (
                 <div className="stock-detail-layout">
                   <div className="stock-detail-main">
@@ -3191,6 +4363,91 @@ export default function App() {
                         <strong>{formatPlainNumber(stockDetail.pb)}</strong>
                       </div>
                     </div>
+
+                    <section className="stock-background-panel">
+                      <div className="stock-background-head">
+                        <div>
+                          <span className="section-kicker">Background</span>
+                          <h3>公司背景与题材</h3>
+                        </div>
+                        <strong>{stockBackgroundInsight.subtitle}</strong>
+                      </div>
+                      <div className="stock-theme-tags">
+                        {stockBackgroundInsight.themeTags.map((tag) => (
+                          <span key={tag}>{tag}</span>
+                        ))}
+                      </div>
+                      <div className="stock-background-grid">
+                        <div>
+                          <span>公司定位</span>
+                          <p>{stockBackgroundInsight.companyContext}</p>
+                        </div>
+                        <div>
+                          <span>题材催化</span>
+                          <p>{stockBackgroundInsight.catalyst}</p>
+                        </div>
+                        <div>
+                          <span>板块强度</span>
+                          <p>{stockBackgroundInsight.themeContext}</p>
+                        </div>
+                        <div>
+                          <span>板块位置</span>
+                          <p>{stockBackgroundInsight.boardPosition}</p>
+                        </div>
+                      </div>
+                      <p><strong>同题材比较：</strong>{stockBackgroundInsight.compare}</p>
+                      <p><strong>数据边界：</strong>{stockBackgroundInsight.dataGap}</p>
+                    </section>
+
+                    <section className="simple-question-panel stock-simple-panel">
+                      <div className="simple-question-head">
+                        <div>
+                          <span className="section-kicker">Simple Question</span>
+                          <h3>这只票是不是简单题</h3>
+                        </div>
+                        <strong>{stockSimpleQuestionInsight.verdict}</strong>
+                      </div>
+                      <p>{stockSimpleQuestionInsight.summary}</p>
+                      <div className="simple-signal-grid">
+                        {stockSimpleQuestionInsight.signals.map((signal) => (
+                          <div key={signal.name} className={`simple-signal ${signal.status}`}>
+                            <span>{signal.name}</span>
+                            <strong>
+                              {signal.status === "passed"
+                                ? "已验证"
+                                : signal.status === "failed"
+                                  ? "有风险"
+                                  : "待确认"}
+                            </strong>
+                            <p>{signal.text}</p>
+                          </div>
+                        ))}
+                      </div>
+                      <p><strong>执行：</strong>{stockSimpleQuestionInsight.action}</p>
+                    </section>
+
+                    <section className="stock-decision-panel">
+                      <div className="stock-decision-head">
+                        <div>
+                          <span className="section-kicker">AI Decision</span>
+                          <h3>个股决策分析</h3>
+                        </div>
+                        <strong>{stockDecisionInsight.verdict}</strong>
+                      </div>
+                      <div className="stock-decision-grid">
+                        <div>
+                          <span>建议动作</span>
+                          <strong>{stockDecisionInsight.action}</strong>
+                        </div>
+                        <div>
+                          <span>仓位态度</span>
+                          <strong>{stockDecisionInsight.position}</strong>
+                        </div>
+                      </div>
+                      <p>{stockDecisionInsight.reason}</p>
+                      <p><strong>风险：</strong>{stockDecisionInsight.risk}</p>
+                      <p><strong>下一步：</strong>{stockDecisionInsight.nextStep}</p>
+                    </section>
 
                     <div className="stock-trend-card">
                       <div className="stock-trend-toolbar">
@@ -3295,8 +4552,7 @@ export default function App() {
                       <span className="section-kicker">Limit Up Context</span>
                       <h3>涨停背景</h3>
                       <p className="stock-side-reason">
-                        {limitUpStocks.find((stock) => stock.code === selectedStockCode)?.reason ??
-                          "当前未命中涨停池原因描述。"}
+                        {selectedLimitUpStock?.reason ?? "当前未命中涨停池原因描述。"}
                       </p>
                     </div>
                   </aside>
@@ -3362,6 +4618,37 @@ export default function App() {
                     </strong>
                     <small>目标价与止损覆盖 {portfolio.length ? Math.round((disciplineCoverageCount / portfolio.length) * 100) : 0}%</small>
                   </div>
+                </div>
+              </article>
+            </section>
+
+            <section className="dashboard-grid">
+              <article className="card full-span holding-theme-card">
+                <div className="card-head">
+                  <div>
+                    <p className="section-kicker">Theme Match</p>
+                    <h2>我的持仓与今日主线</h2>
+                    <p className="market-strip-meta">{holdingThemeSummary}</p>
+                  </div>
+                </div>
+                <div className="holding-theme-list">
+                  {holdingThemeMatches.slice(0, 5).map((item) => (
+                    <article className="holding-theme-item" key={item.holding.code}>
+                      <div>
+                        <strong>{item.holding.name}</strong>
+                        <small>{item.holding.code} · {item.matchedBoard}</small>
+                      </div>
+                      <span className={`holding-theme-badge ${item.relation}`}>{item.relation}</span>
+                      <p>{item.reason}</p>
+                      <p><strong>动作：</strong>{item.action}</p>
+                    </article>
+                  ))}
+                  {holdingThemeMatches.length === 0 && (
+                    <div className="placeholder-card">
+                      <strong>还没有持仓数据</strong>
+                      <p>先录入持仓，交易台会判断你的组合是否贴近今日主线。</p>
+                    </div>
+                  )}
                 </div>
               </article>
             </section>
@@ -3717,6 +5004,68 @@ export default function App() {
                       <span>{reviewPatternSummary}</span>
                     </div>
 
+                    <section className="discipline-panel">
+                      <div className="portfolio-toolbar-copy">
+                        <strong>交易纪律如何形成</strong>
+                        <span>每笔交易先标记模式，盘后复盘实际执行；同一模式至少 3 笔样本后，再沉淀成固定纪律。</span>
+                      </div>
+                      <div className="discipline-steps">
+                        <div><strong>1</strong><span>交易前写模式和计划</span></div>
+                        <div><strong>2</strong><span>交易后复盘偏差</span></div>
+                        <div><strong>3</strong><span>统计胜率与执行率</span></div>
+                        <div><strong>4</strong><span>沉淀入场、退出、仓位和禁做项</span></div>
+                      </div>
+
+                      <form className="discipline-form" onSubmit={handleDisciplineSubmit}>
+                        <div className="holding-form-grid">
+                          <label className="holding-form-field">
+                            <span>模式名称</span>
+                            <input className="real-input" name="name" value={disciplineForm.name} onChange={handleDisciplineFormChange} placeholder="如 主线龙头回踩" />
+                          </label>
+                          <label className="holding-form-field holding-form-field-wide">
+                            <span>入场条件</span>
+                            <textarea className="real-textarea compact-textarea" name="entryRule" value={disciplineForm.entryRule} onChange={handleDisciplineFormChange} placeholder="什么情况下允许买入" />
+                          </label>
+                          <label className="holding-form-field holding-form-field-wide">
+                            <span>退出条件</span>
+                            <textarea className="real-textarea compact-textarea" name="exitRule" value={disciplineForm.exitRule} onChange={handleDisciplineFormChange} placeholder="什么情况下必须卖出或减仓" />
+                          </label>
+                          <label className="holding-form-field">
+                            <span>仓位规则</span>
+                            <input className="real-input" name="positionRule" value={disciplineForm.positionRule} onChange={handleDisciplineFormChange} placeholder="如 单票不超过2成" />
+                          </label>
+                          <label className="holding-form-field">
+                            <span>禁做项</span>
+                            <input className="real-input" name="forbiddenRule" value={disciplineForm.forbiddenRule} onChange={handleDisciplineFormChange} placeholder="如 不追后排二次冲高" />
+                          </label>
+                        </div>
+                        <div className="holding-editor-actions">
+                          {disciplineFormError && <p className="form-error">{disciplineFormError}</p>}
+                          <button type="submit" className="action-btn">保存纪律</button>
+                        </div>
+                      </form>
+
+                      <div className="discipline-rule-list">
+                        {disciplineRules.map((rule) => (
+                          <article className="discipline-rule" key={rule.id}>
+                            <div>
+                              <strong>{rule.name}</strong>
+                              <p><span>入场：</span>{rule.entryRule}</p>
+                              <p><span>退出：</span>{rule.exitRule}</p>
+                              <p><span>仓位：</span>{rule.positionRule}</p>
+                              <p><span>禁做：</span>{rule.forbiddenRule}</p>
+                            </div>
+                            <button type="button" className="inline-action-btn danger" onClick={() => handleDeleteDisciplineRule(rule.id)}>
+                              删除
+                            </button>
+                          </article>
+                        ))}
+                        {disciplineRules.length === 0 && (
+                          <div className="discipline-empty">还没有固定纪律。先从一条最常犯错或最常盈利的模式开始记录。</div>
+                        )}
+                      </div>
+                    </section>
+
                     {!selectedReviewTrade ? (
                       <div className="trade-list">
                         {activeTradeRecords.map((trade) => (
@@ -3805,6 +5154,24 @@ export default function App() {
                             <span>建议动作比例 {item.executionRatio}</span>
                             <span>约 {item.executionShares}</span>
                           </div>
+                          <div className="holding-discipline-grid">
+                            <div>
+                              <span>持仓状态</span>
+                              <strong>{item.holdingState}</strong>
+                            </div>
+                            <div>
+                              <span>主线关系</span>
+                              <strong>{item.themeRelation}</strong>
+                            </div>
+                            <div>
+                              <span>纪律动作</span>
+                              <strong>{item.disciplineAction}</strong>
+                            </div>
+                            <div>
+                              <span>风险位置</span>
+                              <strong>{item.riskPosition}</strong>
+                            </div>
+                          </div>
                           <p>{item.reason}</p>
                           <p>
                             <strong>下一步：</strong>
@@ -3813,6 +5180,10 @@ export default function App() {
                           <p>
                             <strong>预期：</strong>
                             {item.expectation}
+                          </p>
+                          <p>
+                            <strong>复盘验证：</strong>
+                            {item.reviewCheck}
                           </p>
                         </article>
                       ))}

@@ -4,7 +4,9 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "node server/dev.mjs",
+    "dev:web": "vite",
+    "data:server": "node server/marketDataServer.mjs",
     "build": "tsc -b && vite build",
     "ios:sync": "npm run build && npx cap sync ios",
     "preview": "vite preview"
