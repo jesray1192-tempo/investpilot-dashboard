@@ -2596,7 +2596,9 @@ export default function App() {
       return;
     }
 
-    void persistUploadAssets(uploadAssets);
+    void persistUploadAssets(uploadAssets).catch((error) => {
+      console.error("保存上传资产失败：", error);
+    });
   }, [uploadAssets, uploadAssetsReady]);
 
   useEffect(() => {
@@ -2782,8 +2784,14 @@ export default function App() {
       );
     };
 
-    refreshPortfolioQuotes();
-    refreshTimer = window.setInterval(refreshPortfolioQuotes, 30000);
+    const runRefresh = () => {
+      void refreshPortfolioQuotes().catch((error) => {
+        console.error("刷新持仓行情失败：", error);
+      });
+    };
+
+    runRefresh();
+    refreshTimer = window.setInterval(runRefresh, 30000);
 
     return () => {
       disposed = true;
