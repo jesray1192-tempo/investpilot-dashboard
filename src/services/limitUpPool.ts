@@ -1,36 +1,16 @@
 import { LimitUpStock } from "../types";
+import { fetchJson, MarketDataResponse } from "../lib/marketDataClient";
 
 type LimitUpPoolResult = {
   qdate?: number;
   pool: LimitUpStock[];
 };
 
-type MarketDataResponse<T> = {
-  ok: boolean;
-  status: "live" | "fresh-cache" | "stale-cache" | "error";
-  updatedAt?: string;
-  warning?: string;
-  error?: string;
-  data?: T;
-};
-
-async function fetchJson<T>(url: string): Promise<T> {
-  const response = await fetch(url, {
-    headers: {
-      Accept: "application/json, text/plain, */*"
-    }
-  });
-
-  if (!response.ok) {
-    throw new Error(`涨停池请求失败（${response.status}）。`);
-  }
-
-  return (await response.json()) as T;
-}
-
 export async function fetchLiveLimitUpPool() {
-  const response =
-    await fetchJson<MarketDataResponse<LimitUpPoolResult>>("/api/market/limit-up-pool");
+  const response = await fetchJson<MarketDataResponse<LimitUpPoolResult>>(
+    "/api/market/limit-up-pool",
+    (status) => `涨停池请求失败（${status}）。`
+  );
 
   if (!response.ok || !response.data?.pool.length) {
     throw new Error(response.error || "最近 10 天都没有取到涨停池数据。");

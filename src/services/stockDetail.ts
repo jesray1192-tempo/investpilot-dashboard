@@ -1,4 +1,6 @@
 import { StockDetail, StockTrendPoint } from "../types";
+import { fetchJson, MarketDataResponse } from "../lib/marketDataClient";
+import { resolveSecid } from "../lib/stock";
 
 type StockSearchMatch = {
   code: string;
@@ -56,44 +58,14 @@ type EastmoneyStockSearchResponse = {
   };
 };
 
-type CachedApiResponse<T> = {
-  ok: boolean;
-  status: "live" | "fresh-cache" | "stale-cache" | "error";
-  data?: T;
-  error?: string;
-};
-
-async function fetchJson<T>(url: string): Promise<T> {
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      Accept: "application/json, text/plain, */*"
-    }
-  });
-
-  if (!response.ok) {
-    throw new Error(`请求失败: ${response.status}`);
-  }
-
-  return (await response.json()) as T;
-}
-
 async function fetchCachedJson<T>(url: string): Promise<T> {
-  const response = await fetchJson<CachedApiResponse<T>>(url);
+  const response = await fetchJson<MarketDataResponse<T>>(url);
 
   if (!response.ok || !response.data) {
     throw new Error(response.error || "本地数据服务未返回有效数据。");
   }
 
   return response.data;
-}
-
-function resolveSecid(code: string) {
-  if (code.startsWith("6") || code.startsWith("9") || code.startsWith("5")) {
-    return `1.${code}`;
-  }
-
-  return `0.${code}`;
 }
 
 function normalizePrice(value?: number) {
