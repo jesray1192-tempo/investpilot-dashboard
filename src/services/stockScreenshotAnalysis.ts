@@ -1,4 +1,5 @@
 import { LimitUpStock, MultimodalOutput, StockDetail } from "../types";
+import { createEmptyStockDetail } from "../lib/stock";
 import { fetchLiveStockDetail, fetchStockSearchMatch } from "./stockDetail";
 
 type StockIdentity = {
@@ -112,37 +113,10 @@ function extractThemeKeywords(reason?: string, industry?: string) {
 }
 
 function createFallbackDetail(identity: StockIdentity, limitUpMatch: LimitUpStock | null): StockDetail {
-  const inferredMarket = identity.code.startsWith("6") || identity.code.startsWith("9") || identity.code.startsWith("5")
-    ? "SH"
-    : "SZ";
-
-  return {
-    code: identity.code,
-    name: identity.name,
-    market: inferredMarket,
+  return createEmptyStockDetail(identity.code, identity.name, {
     industry: limitUpMatch?.industry || "待确认",
-    price: limitUpMatch?.price || 0,
-    changeAmount: 0,
-    changePercent: 0,
-    open: 0,
-    high: 0,
-    low: 0,
-    prevClose: 0,
-    averagePrice: 0,
-    volume: 0,
-    amount: 0,
-    volumeRatio: 0,
-    turnoverRate: 0,
-    amplitude: 0,
-    upLimit: 0,
-    downLimit: 0,
-    totalShares: 0,
-    floatShares: 0,
-    totalMarketCap: 0,
-    floatMarketCap: 0,
-    peTtm: null,
-    pb: null
-  };
+    price: limitUpMatch?.price || 0
+  });
 }
 
 function buildPeerIdeas(
