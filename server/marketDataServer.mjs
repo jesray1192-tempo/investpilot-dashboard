@@ -1,10 +1,30 @@
 import { createServer } from "node:http";
+import { existsSync } from "node:fs";
+
+if (typeof process.loadEnvFile === "function" && existsSync(".env")) {
+  process.loadEnvFile(".env");
+}
 
 const port = Number(process.env.MARKET_DATA_PORT ?? 8787);
-const eastmoneyToken = "fa5fd1943c7b386f172d6893dbfba10b";
-const limitUpToken = "7eea3edcaed734bea9cbfc24409ed989";
+const eastmoneyToken = process.env.EASTMONEY_TOKEN;
+const limitUpToken = process.env.EASTMONEY_LIMIT_UP_TOKEN;
+const searchToken = process.env.EASTMONEY_SEARCH_TOKEN;
+const allowedOrigin = process.env.MARKET_DATA_ALLOWED_ORIGIN ?? "http://localhost:5173";
 const cacheTtlMs = 30_000;
 const requestTimeoutMs = 8_000;
+
+for (const [name, value] of [
+  ["EASTMONEY_TOKEN", eastmoneyToken],
+  ["EASTMONEY_LIMIT_UP_TOKEN", limitUpToken],
+  ["EASTMONEY_SEARCH_TOKEN", searchToken]
+]) {
+  if (!value) {
+    console.error(
+      `Missing required environment variable ${name}. See .env.example for setup instructions.`
+    );
+    process.exit(1);
+  }
+}
 
 const cache = new Map();
 
@@ -21,7 +41,7 @@ function sendJson(response, statusCode, payload) {
   response.writeHead(statusCode, {
     "content-type": "application/json; charset=utf-8",
     "cache-control": "no-store",
-    "access-control-allow-origin": "*"
+    "access-control-allow-origin": allowedOrigin
   });
   response.end(JSON.stringify(payload));
 }
@@ -283,6 +303,11 @@ const server = createServer(async (request, response) => {
         return;
       }
 
+      if (!/^\d{1,3}$/.test(days)) {
+        sendJson(response, 400, { ok: false, error: "Invalid days" });
+        return;
+      }
+
       const payload = await cachedEndpoint(`stock-trends-${secid}-${days}`, () =>
         fetchJson(
           `https://push2his.eastmoney.com/api/qt/stock/trends2/get?fields1=f1,f2,f3,f4,f5,f6,f7,f8&fields2=f51,f52,f53,f54,f55,f56,f57,f58&iscr=0&ndays=${encodeURIComponent(days)}&secid=${encodeURIComponent(secid)}&ut=${limitUpToken}`
@@ -301,7 +326,7 @@ const server = createServer(async (request, response) => {
 
       const payload = await cachedEndpoint(`stock-search-${input}`, () =>
         fetchJson(
-          `https://searchadapter.eastmoney.com/api/suggest/get?input=${encodeURIComponent(input)}&type=14&token=D43BF722C8E33BDC906FB84D85E326E8&count=10`
+          `https://searchadapter.eastmoney.com/api/suggest/get?input=${encodeURIComponent(input)}&type=14&token=${encodeURIComponent(searchToken)}&count=10`
         )
       );
       sendJson(response, 200, payload);

@@ -13,8 +13,11 @@
 
 ```bash
 npm install
+cp .env.example .env   # 配置行情服务所需的环境变量
 npm run dev
 ```
+
+> 行情服务所需的令牌通过环境变量注入（见 `.env.example`），不再硬编码在源码中。`.env` 已被 git 忽略，请勿提交。
 
 默认启动地址：
 
