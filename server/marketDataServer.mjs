@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { pathToFileURL } from "node:url";
 
 const port = Number(process.env.MARKET_DATA_PORT ?? 8787);
 const eastmoneyToken = "fa5fd1943c7b386f172d6893dbfba10b";
@@ -136,20 +137,20 @@ async function loadMarketIndices() {
   });
 }
 
-function formatTradeDate(date) {
+export function formatTradeDate(date) {
   const year = date.getFullYear();
   const month = `${date.getMonth() + 1}`.padStart(2, "0");
   const day = `${date.getDate()}`.padStart(2, "0");
   return `${year}${month}${day}`;
 }
 
-function shiftDate(baseDate, days) {
+export function shiftDate(baseDate, days) {
   const nextDate = new Date(baseDate);
   nextDate.setDate(baseDate.getDate() - days);
   return nextDate;
 }
 
-function formatSealAmount(value) {
+export function formatSealAmount(value) {
   if (typeof value !== "number" || Number.isNaN(value) || value <= 0) {
     return "暂无";
   }
@@ -158,7 +159,7 @@ function formatSealAmount(value) {
   return `${amountInYi >= 100 ? amountInYi.toFixed(0) : amountInYi.toFixed(2)}亿`;
 }
 
-function formatTime(value) {
+export function formatTime(value) {
   if (typeof value !== "number" || Number.isNaN(value) || value <= 0) {
     return "--:--";
   }
@@ -167,7 +168,7 @@ function formatTime(value) {
   return `${text.slice(0, 2)}:${text.slice(2, 4)}`;
 }
 
-function buildSealStrength(sealFund, openBoardCount) {
+export function buildSealStrength(sealFund, openBoardCount) {
   if (typeof sealFund !== "number" || Number.isNaN(sealFund) || sealFund <= 0) {
     return "未知";
   }
@@ -190,7 +191,7 @@ function buildSealStrength(sealFund, openBoardCount) {
   return "偏弱";
 }
 
-function mapPoolItem(item) {
+export function mapPoolItem(item) {
   if (!item.c || !item.n || typeof item.p !== "number") {
     return null;
   }
@@ -318,6 +319,11 @@ const server = createServer(async (request, response) => {
   }
 });
 
-server.listen(port, "127.0.0.1", () => {
-  console.log(`Market data server listening on http://127.0.0.1:${port}`);
-});
+const isMainModule =
+  process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (isMainModule) {
+  server.listen(port, "127.0.0.1", () => {
+    console.log(`Market data server listening on http://127.0.0.1:${port}`);
+  });
+}
