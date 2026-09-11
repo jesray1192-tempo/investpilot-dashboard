@@ -1,4 +1,5 @@
 import { LimitUpStock } from "../types";
+import { fetchJson } from "./http";
 
 type LimitUpPoolResult = {
   qdate?: number;
@@ -13,20 +14,6 @@ type MarketDataResponse<T> = {
   error?: string;
   data?: T;
 };
-
-async function fetchJson<T>(url: string): Promise<T> {
-  const response = await fetch(url, {
-    headers: {
-      Accept: "application/json, text/plain, */*"
-    }
-  });
-
-  if (!response.ok) {
-    throw new Error(`涨停池请求失败（${response.status}）。`);
-  }
-
-  return (await response.json()) as T;
-}
 
 export async function fetchLiveLimitUpPool() {
   const response =

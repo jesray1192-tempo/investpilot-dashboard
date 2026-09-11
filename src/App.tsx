@@ -1,13 +1,15 @@
 import { ChangeEvent, ClipboardEvent, DragEvent, FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
 import {
   dataSources,
-  fundFlowBoards,
   marketBreadth,
-  marketEvents,
-  portfolioProfiles,
-  riskSignals,
-  sectorBoards
+  marketEvents
 } from "./data/mock";
+import { pageElapsedMs, track, trackOnce } from "./services/analytics";
+import {
+  dashboardQuotesAreReady,
+  hasShownDecisionConclusion,
+  renderedIndexQuotesMatch
+} from "./services/funnel";
 import { fetchLiveLimitUpPool } from "./services/limitUpPool";
 import { fetchLiveMarketIndices } from "./services/marketIndices";
 import { analyzeStockByManualInput, analyzeStockScreenshotAsset } from "./services/stockScreenshotAnalysis";
@@ -193,14 +195,6 @@ type HoldingAiAction = {
   reviewCheck: string;
   reason: string;
   nextStep: string;
-  expectation: string;
-};
-
-type AiIdea = {
-  sector: string;
-  stock: string;
-  code: string;
-  reason: string;
   expectation: string;
 };
 
@@ -428,7 +422,7 @@ function parseAppHash(hash: string): {
 const navItems: NavItem[] = [
   { key: "home", label: "主线看板", icon: "◎", description: "先看今天市场在交易什么" },
   { key: "policy", label: "个股决策", icon: "◫", description: "围绕单只股票做判断、比较和跟踪" },
-  { key: "ai", label: "材料解读", icon: "✦", description: "上传材料，直接输出个股或题材结论" },
+  { key: "ai", label: "材料解读", icon: "✦", description: "上传材料做规则解读，不是模型结论" },
   { key: "portfolio", label: "我的交易台", icon: "▣", description: "持仓、交易、纪律与复盘执行" }
 ];
 
@@ -575,9 +569,10 @@ const emptyDisciplineForm: DisciplineFormState = {
   forbiddenRule: ""
 };
 
-const portfolioProfilesStorageKey = "investpilot-portfolio-profiles";
-const activePortfolioProfileStorageKey = "investpilot-active-portfolio-profile";
+const portfolioProfilesStorageKey = "investpilot-portfolio-profiles-v2";
+const activePortfolioProfileStorageKey = "investpilot-active-portfolio-profile-v2";
 const disciplineRulesStorageKey = "investpilot-discipline-rules";
+const decisionResultsStorageKey = "investpilot-decision-results";
 const uploadAssetsDbName = "investpilot-upload-assets";
 const uploadAssetsStoreName = "assets";
 
@@ -650,33 +645,35 @@ function persistUploadAssets(assets: UploadAsset[]) {
   });
 }
 
-function clonePortfolioProfiles(profiles: PortfolioProfile[]) {
-  return profiles.map((profile) => ({
-    ...profile,
-    holdings: profile.holdings.map((holding) => ({
-      ...holding,
-      tags: [...holding.tags]
-    })),
-    trades: profile.trades.map((trade) => ({ ...trade }))
-  }));
+function createEmptyVisitorProfiles(): PortfolioProfile[] {
+  return [
+    {
+      id: "mine",
+      label: "我的持仓",
+      description: "仅保存在本机，未登录不会同步，也不会预填示例仓位。",
+      cashEstimate: 0,
+      holdings: [],
+      trades: []
+    }
+  ];
 }
 
 function loadPortfolioProfilesFromStorage() {
   if (typeof window === "undefined") {
-    return clonePortfolioProfiles(portfolioProfiles);
+    return createEmptyVisitorProfiles();
   }
 
   try {
     const raw = window.localStorage.getItem(portfolioProfilesStorageKey);
 
     if (!raw) {
-      return clonePortfolioProfiles(portfolioProfiles);
+      return createEmptyVisitorProfiles();
     }
 
     const parsed = JSON.parse(raw) as PortfolioProfile[];
 
     if (!Array.isArray(parsed) || parsed.length === 0) {
-      return clonePortfolioProfiles(portfolioProfiles);
+      return createEmptyVisitorProfiles();
     }
 
     return parsed.map((profile) => ({
@@ -690,17 +687,55 @@ function loadPortfolioProfilesFromStorage() {
       trades: Array.isArray(profile.trades) ? profile.trades.map((trade) => ({ ...trade })) : []
     }));
   } catch {
-    return clonePortfolioProfiles(portfolioProfiles);
+    return createEmptyVisitorProfiles();
   }
 }
 
 function loadActivePortfolioProfileIdFromStorage() {
   if (typeof window === "undefined") {
-    return portfolioProfiles[0]?.id ?? "mine";
+    return "mine";
   }
 
   const stored = window.localStorage.getItem(activePortfolioProfileStorageKey);
-  return stored || portfolioProfiles[0]?.id || "mine";
+  return stored || "mine";
+}
+
+type LocalDecisionResult = {
+  code: string;
+  name: string;
+  verdict: string;
+  action: string;
+  completedAt: string;
+};
+
+function loadDecisionResultsFromStorage(): LocalDecisionResult[] {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  try {
+    const raw = window.localStorage.getItem(decisionResultsStorageKey);
+    const parsed = raw ? (JSON.parse(raw) as LocalDecisionResult[]) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function HeuristicNotice({ children }: { children?: ReactNode }) {
+  return (
+    <p className="heuristic-notice" role="note">
+      规则推演 · 非模型结论{children ? ` · ${children}` : ""}
+    </p>
+  );
+}
+
+function PlaceholderNotice({ children }: { children?: ReactNode }) {
+  return (
+    <p className="heuristic-notice placeholder-notice" role="note">
+      占位内容 · 非正式数据{children ? ` · ${children}` : ""}
+    </p>
+  );
 }
 
 function loadDisciplineRulesFromStorage(): DisciplineRule[] {
@@ -1480,51 +1515,6 @@ function buildHoldingAiActions(
   }).sort((left, right) => left.score - right.score);
 }
 
-function buildAiIdeas(items: Holding[]): AiIdea[] {
-  const heldThemes = new Set(items.flatMap((item) => item.tags));
-  const preferredBoards = sectorBoards
-    .filter((board) => board.change > 0 && !heldThemes.has(board.name))
-    .slice(0, 2);
-  const flowBoards = fundFlowBoards.filter((board) => board.strength !== "weak").slice(0, 2);
-
-  const boardIdeas = preferredBoards.map((board) => ({
-    sector: board.name,
-    stock: board.stocks[0]?.name ?? board.leader,
-    code: board.stocks[0]?.code ?? "--",
-    reason: `${board.note} 当前板块涨幅 ${percent(board.change)}，具备资金继续抱团的基础。`,
-    expectation: `预期若主线延续，${board.stocks[0]?.name ?? board.leader} 更容易成为下一阶段的前排承接标的。`
-  }));
-
-  const flowIdeas = flowBoards.map((board) => ({
-    sector: board.name,
-    stock:
-      board.name === "证券"
-        ? "东方财富"
-        : board.name === "汽车零部件"
-          ? "沃尔核材"
-          : board.name === "消费电子"
-            ? "立讯精密"
-            : board.name,
-    code:
-      board.name === "证券"
-        ? "300059"
-        : board.name === "汽车零部件"
-          ? "002130"
-          : board.name === "消费电子"
-            ? "002475"
-            : "--",
-    reason: `${board.note} 资金流入方向清晰，适合做组合中新开仓的进攻补充。`,
-    expectation: `若市场成交额维持在 ${marketBreadth.turnover} 附近，该方向更容易拿到增量资金。`
-  }));
-
-  return [...boardIdeas, ...flowIdeas]
-    .filter(
-      (idea, index, array) =>
-        array.findIndex((candidate) => candidate.code === idea.code) === index
-    )
-    .slice(0, 3);
-}
-
 function buildPortfolioAiRoadmap(
   items: Holding[],
   actions: HoldingAiAction[],
@@ -1794,9 +1784,12 @@ export default function App() {
   const marketValue = useMemo(() => totalMarketValue(portfolio), [portfolio]);
   const costValue = useMemo(() => totalCostValue(portfolio), [portfolio]);
   const pnl = marketValue - costValue;
-  const pnlPercent = (pnl / costValue) * 100;
+  const pnlPercent = costValue > 0 ? (pnl / costValue) * 100 : 0;
+  const [decisionResults, setDecisionResults] = useState<LocalDecisionResult[]>(() =>
+    loadDecisionResultsFromStorage()
+  );
+  const [decisionSavedNotice, setDecisionSavedNotice] = useState("");
   const isEditablePortfolio = activePortfolioProfile?.id === "mine";
-  const aiIdeas = useMemo(() => buildAiIdeas(portfolio), [portfolio]);
   const reviewedTrades = useMemo(
     () => activeTradeRecords.filter((trade) => trade.review),
     [activeTradeRecords]
@@ -1847,12 +1840,77 @@ export default function App() {
   }, [activePortfolioProfileId, portfolioProfilesState]);
 
   const riskScore = useMemo(() => {
+    if (portfolio.length === 0) {
+      return 0;
+    }
+
     return Math.round(
       (portfolio.reduce((sum, item) => sum + Math.abs(item.dailyChange), 0) /
         portfolio.length) *
         20
     );
   }, [portfolio]);
+
+  useEffect(() => {
+    trackOnce("landing_view", "landing_view", { path: window.location.pathname });
+  }, []);
+
+  useEffect(() => {
+    const quotesReadyInState = dashboardQuotesAreReady({
+      activeNav,
+      activeHomeSubpage,
+      marketIndicesLoading,
+      limitUpLoading,
+      marketIndicesError,
+      limitUpError,
+      marketIndices,
+      limitUpCount: limitUpStocks.length
+    });
+
+    if (!quotesReadyInState) {
+      return;
+    }
+
+    let cancelled = false;
+    const frame = window.requestAnimationFrame(() => {
+      if (cancelled || !renderedIndexQuotesMatch(marketIndices)) {
+        return;
+      }
+
+      const elapsedMs = pageElapsedMs();
+      trackOnce("dashboard_ready", "dashboard_ready", {
+        indexCount: marketIndices.length,
+        limitUpCount: limitUpStocks.length,
+        elapsedMs
+      });
+      trackOnce("time_to_dashboard", "time_to_dashboard", { elapsedMs });
+    });
+
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(frame);
+    };
+  }, [
+    activeHomeSubpage,
+    activeNav,
+    limitUpError,
+    limitUpLoading,
+    limitUpStocks.length,
+    marketIndices,
+    marketIndicesError,
+    marketIndicesLoading
+  ]);
+
+  useEffect(() => {
+    if (!selectedStockCode) {
+      return;
+    }
+
+    track("stock_open", {
+      code: selectedStockCode,
+      source: activeNav === "policy" ? "decision" : "dashboard"
+    });
+  }, [activeNav, selectedStockCode]);
 
   useEffect(() => {
     let disposed = false;
@@ -2565,6 +2623,10 @@ export default function App() {
   }, [disciplineRules]);
 
   useEffect(() => {
+    window.localStorage.setItem(decisionResultsStorageKey, JSON.stringify(decisionResults));
+  }, [decisionResults]);
+
+  useEffect(() => {
     let disposed = false;
 
     const loadAssets = async () => {
@@ -3056,6 +3118,27 @@ export default function App() {
     }
   }
 
+  function handleCompleteDecision() {
+    if (!stockDetail || !hasShownDecisionConclusion(stockDetail, stockDecisionInsight)) {
+      return;
+    }
+
+    const result: LocalDecisionResult = {
+      code: stockDetail.code,
+      name: stockDetail.name,
+      verdict: stockDecisionInsight.verdict,
+      action: stockDecisionInsight.action,
+      completedAt: new Date().toISOString()
+    };
+
+    setDecisionResults((current) => [result, ...current.filter((item) => item.code !== result.code)].slice(0, 20));
+    setDecisionSavedNotice("本次决策已保存在本机。未上传身份信息，登录同步尚未开放。");
+    track("decision_complete", {
+      code: result.code,
+      verdict: result.verdict
+    });
+  }
+
   function handleLimitUpSort(field: LimitUpSortField) {
     if (limitUpSortField === field) {
       setLimitUpSortDirection((current) => (current === "asc" ? "desc" : "asc"));
@@ -3239,7 +3322,7 @@ export default function App() {
           <span className="brand-mark">IP</span>
           <div>
             <strong>InvestPilot</strong>
-            <p>Personal Market Terminal</p>
+            <p>A-share Tools</p>
           </div>
         </div>
         <nav className="sidebar-nav">
@@ -3266,7 +3349,7 @@ export default function App() {
             <span className="brand-mark">IP</span>
             <div>
               <strong>InvestPilot</strong>
-              <p>Personal Market Terminal</p>
+              <p>A-share Tools</p>
             </div>
           </div>
           <div>
@@ -3293,12 +3376,13 @@ export default function App() {
                     查看更多
                   </button>
                 </div>
+                <PlaceholderNotice>快讯接口尚未接入，下面不是实时资讯。</PlaceholderNotice>
                 <div className="headline-feed">
                   <div className={`impact-dot ${homeHeadline.impact}`} />
                   <div className="headline-feed-copy">
-                    <strong>{homeHeadline.title}</strong>
+                    <strong>【占位】{homeHeadline.title}</strong>
                     <p>
-                      {homeHeadline.time} · {homeHeadline.source}
+                      {homeHeadline.time} · {homeHeadline.source} · 占位
                     </p>
                   </div>
                 </div>
@@ -3319,11 +3403,13 @@ export default function App() {
                   </p>
                 </div>
               </div>
-              <div className="index-row">
+              <div className="index-row" data-funnel-quotes={marketIndices.length > 0 ? "ready" : "empty"}>
                 {marketIndices.map((index) => (
-                  <div className="index-item" key={index.code ?? index.name}>
-                    <span className="index-name">{index.name}</span>
-                    <strong className={index.change >= 0 ? "up" : "down"}>
+                  <div className="index-item" data-funnel-index={index.code ?? index.name} key={index.code ?? index.name}>
+                    <span className="index-name" data-funnel-index-name>
+                      {index.name}
+                    </span>
+                    <strong className={index.change >= 0 ? "up" : "down"} data-funnel-index-value>
                       {index.value.toFixed(2)}
                     </strong>
                     <span className={`index-change ${index.change >= 0 ? "up" : "down"}`}>
@@ -3345,6 +3431,7 @@ export default function App() {
                     {intradayDecision.tradeStatus}
                   </span>
                 </div>
+                <HeuristicNotice>根据实时涨停池和指数做规则打分，不是大模型结论。</HeuristicNotice>
                 <p className="decision-summary">{intradayDecision.summary}</p>
                 <div className="decision-grid">
                   <div className="decision-tile">
@@ -3372,6 +3459,7 @@ export default function App() {
                     </div>
                     <strong>{marketSimpleQuestionInsight.verdict}</strong>
                   </div>
+                  <HeuristicNotice>盘面规则清单，不是模型结论。</HeuristicNotice>
                   <p>{marketSimpleQuestionInsight.summary}</p>
                   <div className="simple-signal-grid">
                     {marketSimpleQuestionInsight.signals.map((signal) => (
@@ -3397,11 +3485,12 @@ export default function App() {
               <article className="card full-span">
                 <div className="card-head">
                   <div>
-                    <p className="section-kicker">AI Board Picks</p>
+                    <p className="section-kicker">Rule Board Picks</p>
                     <h2>今日最具投资属性的 3 个板块</h2>
                     <p className="market-strip-meta">
                       按涨停家数、连板高度、封单合计、开板压力和前排质量综合排序。
                     </p>
+                    <HeuristicNotice>规则排序，不是模型选股结论。</HeuristicNotice>
                   </div>
                 </div>
                 <div className="investable-board-grid">
@@ -3631,6 +3720,7 @@ export default function App() {
 
                 {activeMarketTab === "heat" && (
                   <>
+                    <PlaceholderNotice>热度数值仍是静态占位，不是实时统计。</PlaceholderNotice>
                     <div className="gauge">
                       <div className="gauge-ring">
                         <div className="gauge-value">{marketBreadth.heat.toFixed(1)}°</div>
@@ -3646,6 +3736,7 @@ export default function App() {
 
                 {activeMarketTab === "turnover" && (
                   <>
+                    <PlaceholderNotice>成交额与波动分仍是静态占位，不是实时统计。</PlaceholderNotice>
                     <div className="big-metric">{marketBreadth.turnover}</div>
                     <div className="dual-metrics">
                       <div>
@@ -3879,12 +3970,13 @@ export default function App() {
                   返回首页
                 </button>
               </div>
+              <PlaceholderNotice>快讯接口尚未接入，以下为占位条目。</PlaceholderNotice>
               <div className="event-list">
                 {marketEvents.map((event) => (
                   <div className="event-item" key={`${event.time}-${event.title}`}>
                     <div className={`impact-dot ${event.impact}`} />
                     <div>
-                      <strong>{event.title}</strong>
+                      <strong>【占位】{event.title}</strong>
                       <p>
                         {event.time} · {event.source}
                       </p>
@@ -4187,7 +4279,7 @@ export default function App() {
                   </div>
                   <div className="placeholder-card">
                     <strong>更合理的使用顺序</strong>
-                    <p>先在主线看板确认今日最强方向，再进入前排个股，最后结合 AI 材料解读补齐逻辑和风险。</p>
+                    <p>先在主线看板确认今日最强方向，再进入前排个股。材料解读页是规则/模板推演，不是模型结论。</p>
                   </div>
                   <div className="placeholder-card">
                     <strong>辅助参考</strong>
@@ -4407,6 +4499,7 @@ export default function App() {
                         </div>
                         <strong>{stockSimpleQuestionInsight.verdict}</strong>
                       </div>
+                      <HeuristicNotice>规则清单，不是模型结论。</HeuristicNotice>
                       <p>{stockSimpleQuestionInsight.summary}</p>
                       <div className="simple-signal-grid">
                         {stockSimpleQuestionInsight.signals.map((signal) => (
@@ -4426,14 +4519,15 @@ export default function App() {
                       <p><strong>执行：</strong>{stockSimpleQuestionInsight.action}</p>
                     </section>
 
-                    <section className="stock-decision-panel">
+                    <section className="stock-decision-panel" data-funnel-decision-panel>
                       <div className="stock-decision-head">
                         <div>
-                          <span className="section-kicker">AI Decision</span>
+                          <span className="section-kicker">Rule Decision</span>
                           <h3>个股决策分析</h3>
                         </div>
-                        <strong>{stockDecisionInsight.verdict}</strong>
+                        <strong data-funnel-decision-verdict>{stockDecisionInsight.verdict}</strong>
                       </div>
+                      <HeuristicNotice>规则推演，不是真实 AI 结论，也不能替代你自己的交易判断。</HeuristicNotice>
                       <div className="stock-decision-grid">
                         <div>
                           <span>建议动作</span>
@@ -4447,6 +4541,20 @@ export default function App() {
                       <p>{stockDecisionInsight.reason}</p>
                       <p><strong>风险：</strong>{stockDecisionInsight.risk}</p>
                       <p><strong>下一步：</strong>{stockDecisionInsight.nextStep}</p>
+                      <div className="decision-complete-row">
+                        <button
+                          type="button"
+                          className="action-btn"
+                          onClick={handleCompleteDecision}
+                          disabled={!stockDetail || stockDetail.price <= 0 || stockDecisionInsight.verdict === "等待数据" || stockDecisionInsight.verdict === "基础分析"}
+                        >
+                          完成本次决策（仅本机）
+                        </button>
+                        <p className="topbar-note">
+                          {decisionSavedNotice ||
+                            "完成一次工具任务后，结果只暂存在这台设备，不会上传身份信息。"}
+                        </p>
+                      </div>
                     </section>
 
                     <div className="stock-trend-card">
@@ -4829,6 +4937,21 @@ export default function App() {
                           <span>买入逻辑</span>
                           <span>操作</span>
                         </div>
+                        {portfolio.length === 0 && (
+                          <div className="table-row wide-table-row holding-table-row">
+                            <FieldValue
+                              label="股票"
+                              hideLabel
+                              className="inline-thesis-cell"
+                              value={
+                                <>
+                                  <strong>还没有持仓</strong>
+                                  <small>访客默认空仓，不会预填茅台、宁德时代等示例仓位。</small>
+                                </>
+                              }
+                            />
+                          </div>
+                        )}
                         {portfolio.map((item) => {
                           const currentValue = item.shares * item.price;
                           const currentCost = item.shares * item.cost;
@@ -5110,10 +5233,18 @@ export default function App() {
               <article className="card full-span">
                 <div className="card-head">
                   <div>
-                    <p className="section-kicker">AI Portfolio Coach</p>
-                    <h2>AI持仓建议</h2>
+                    <p className="section-kicker">Rule Coach</p>
+                    <h2>持仓规则建议</h2>
                   </div>
                 </div>
+                <HeuristicNotice>本地规则打分，不是模型投顾，也不会把持仓上传到服务器。</HeuristicNotice>
+                {portfolio.length === 0 ? (
+                  <div className="placeholder-card">
+                    <strong>还没有可评估的持仓</strong>
+                    <p>访客默认不会看到示例仓位。你自己录入后，才会出现规则建议。</p>
+                  </div>
+                ) : (
+                <>
                 <section className="portfolio-ai-roadmap">
                   <div className="portfolio-ai-roadmap-item">
                     <span>组合路线</span>
@@ -5190,12 +5321,12 @@ export default function App() {
                     </div>
                   </section>
 
-                  <section className="portfolio-ai-panel">
-                    <div className="portfolio-ai-head">
-                      <strong>可新入方向</strong>
-                      <span>基于当前组合缺口、板块强度和资金趋势，给出更值得新开仓的行业与个股。</span>
-                    </div>
-                    {fundingPlans.length > 0 && (
+                  {fundingPlans.length > 0 && (
+                    <section className="portfolio-ai-panel">
+                      <div className="portfolio-ai-head">
+                        <strong>资金腾挪</strong>
+                        <span>仅基于你已录入的本地持仓做规则提示。</span>
+                      </div>
                       <div className="portfolio-ai-funding">
                         <strong>建议从以下持仓腾挪新仓资金</strong>
                         <div className="portfolio-ai-funding-list">
@@ -5213,29 +5344,11 @@ export default function App() {
                           ))}
                         </div>
                       </div>
-                    )}
-                    <div className="portfolio-ai-list">
-                      {aiIdeas.map((idea) => (
-                        <article className="portfolio-ai-item" key={`${idea.code}-${idea.sector}`}>
-                          <div className="portfolio-ai-item-head">
-                            <div>
-                              <strong>
-                                {idea.stock}
-                                <span>{idea.code}</span>
-                              </strong>
-                              <small>{idea.sector}</small>
-                            </div>
-                          </div>
-                          <p>{idea.reason}</p>
-                          <p>
-                            <strong>预期：</strong>
-                            {idea.expectation}
-                          </p>
-                        </article>
-                      ))}
-                    </div>
-                  </section>
+                    </section>
+                  )}
                 </div>
+                </>
+                )}
               </article>
 
               <article className="card full-span">
@@ -5245,17 +5358,18 @@ export default function App() {
                     <h2>风险提示</h2>
                   </div>
                 </div>
-                <div className="signal-list">
-                  {riskSignals.map((signal) => (
-                    <div className="signal-item" key={signal.title}>
-                      <span className={`signal-level ${signal.level}`}>{signal.level}</span>
-                      <div>
-                        <strong>{signal.title}</strong>
-                        <p>{signal.detail}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <PlaceholderNotice>不再展示预置示例组合的风险结论。</PlaceholderNotice>
+                {portfolio.length === 0 ? (
+                  <div className="placeholder-card">
+                    <strong>访客没有默认持仓</strong>
+                    <p>录入真实仓位后，这里只会对你自己的本地持仓做规则提示。</p>
+                  </div>
+                ) : (
+                  <div className="placeholder-card">
+                    <strong>风险提示只覆盖你已录入的持仓</strong>
+                    <p>示例仓位和伪 AI 风险结论已隐藏，避免被当成你的资产或模型判断。</p>
+                  </div>
+                )}
               </article>
 
             </section>
@@ -5268,7 +5382,7 @@ export default function App() {
               <div className="card-head">
                 <div>
                   <p className="section-kicker">Workspace</p>
-                  <h1>AI分析工作台</h1>
+                  <h1>材料解读工作台</h1>
                 </div>
               </div>
               <section className="multimodal-layout">
@@ -5284,7 +5398,7 @@ export default function App() {
                       onDrop={handleUploadDrop}
                     >
                       <strong>上传视频 / 图片 / 文件</strong>
-                      <p>支持视频、截图、研报 PDF、会议纪要、政策文件、财报和各类文档。视频时长不做限制，AI 会按内容自动分段总结。</p>
+                      <p>支持视频、截图、研报 PDF、会议纪要、政策文件、财报和各类文档。当前输出是规则/模板推演，不是大模型结论。</p>
                       <div className="upload-actions">
                         <label className="upload-trigger">
                           选择本地文件
@@ -5308,7 +5422,7 @@ export default function App() {
                           onChange={(event) => setAiLinkInput(event.target.value)}
                           placeholder="可选：粘贴视频链接、文章链接、网页地址"
                         />
-                        <p>如果有外部链接，点击 AI分析 时会自动并入当前材料队列一起解析。</p>
+                        <p>如果有外部链接，点击开始解读时会并入当前材料队列。输出会标明这是规则推演。</p>
                       </div>
                     </div>
 
@@ -5321,7 +5435,7 @@ export default function App() {
                         }}
                         disabled={analysisLoading}
                       >
-                        {analysisLoading ? "分析中..." : "AI分析"}
+                        {analysisLoading ? "解读中..." : "开始解读"}
                       </button>
                     </div>
 
@@ -5356,7 +5470,7 @@ export default function App() {
                       ) : (
                         <div className="ai-empty-state">
                           <strong>材料队列还是空的</strong>
-                          <p>先拖入视频、文档或截图，再让 AI 基于同一批材料做首轮拆解。</p>
+                          <p>先拖入视频、文档或截图，再做首轮规则拆解。结果不是模型结论。</p>
                         </div>
                       )}
                     </div>
@@ -5384,20 +5498,21 @@ export default function App() {
 
                 {analysisError && (
                   <div className="placeholder-card analysis-summary-card">
-                    <strong>AI 分析失败</strong>
+                    <strong>材料解读失败</strong>
                     <p>{analysisError}</p>
                   </div>
                 )}
 
                 {analysisLoading && (
                   <div className="placeholder-card analysis-summary-card">
-                    <strong>AI 正在分析当前材料</strong>
-                    <p>如果是股票截图，当前会先识别图片文字，再提取股票名称/代码，并结合个股详情与涨停池生成分析。</p>
+                    <strong>正在解读当前材料</strong>
+                    <p>如果是股票截图，当前会先识别图片文字，再提取股票名称/代码，并结合个股详情与涨停池生成规则分析。</p>
                   </div>
                 )}
 
                 {!analysisLoading && multimodalOutput && (
                   <div className="analysis-flow">
+                    <HeuristicNotice>OCR + 规则模板，不是大模型结论，不能当作买卖依据。</HeuristicNotice>
                     {multimodalOutput.entryVerdict && (
                       <div className="placeholder-card analysis-summary-card">
                         <span className={`analysis-verdict-chip ${multimodalOutput.entryVerdict.tone}`}>

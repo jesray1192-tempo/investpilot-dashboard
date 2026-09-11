@@ -1,4 +1,5 @@
 import { MarketIndex } from "../types";
+import { fetchJson } from "./http";
 
 type MarketDataResponse<T> = {
   ok: boolean;
@@ -8,20 +9,6 @@ type MarketDataResponse<T> = {
   error?: string;
   data?: T;
 };
-
-async function fetchJson<T>(url: string): Promise<T> {
-  const response = await fetch(url, {
-    headers: {
-      Accept: "application/json, text/plain, */*"
-    }
-  });
-
-  if (!response.ok) {
-    throw new Error(`实时行情请求失败（${response.status}）。`);
-  }
-
-  return (await response.json()) as T;
-}
 
 export async function fetchLiveMarketIndices(): Promise<MarketIndex[]> {
   const response = await fetchJson<MarketDataResponse<MarketIndex[]>>("/api/market/indices");
