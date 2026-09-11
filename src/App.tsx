@@ -5,6 +5,11 @@ import {
   marketEvents
 } from "./data/mock";
 import { pageElapsedMs, track, trackOnce } from "./services/analytics";
+import {
+  dashboardQuotesAreReady,
+  hasShownDecisionConclusion,
+  renderedIndexQuotesMatch
+} from "./services/funnel";
 import { fetchLiveLimitUpPool } from "./services/limitUpPool";
 import { fetchLiveMarketIndices } from "./services/marketIndices";
 import { analyzeStockByManualInput, analyzeStockScreenshotAsset } from "./services/stockScreenshotAnalysis";
@@ -1851,24 +1856,50 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const dashboardHasRealData =
-      !marketIndicesLoading &&
-      marketIndices.length > 0 &&
-      !limitUpLoading &&
-      limitUpStocks.length > 0;
+    const quotesReadyInState = dashboardQuotesAreReady({
+      activeNav,
+      activeHomeSubpage,
+      marketIndicesLoading,
+      limitUpLoading,
+      marketIndicesError,
+      limitUpError,
+      marketIndices,
+      limitUpCount: limitUpStocks.length
+    });
 
-    if (!dashboardHasRealData) {
+    if (!quotesReadyInState) {
       return;
     }
 
-    const elapsedMs = pageElapsedMs();
-    trackOnce("dashboard_ready", "dashboard_ready", {
-      indexCount: marketIndices.length,
-      limitUpCount: limitUpStocks.length,
-      elapsedMs
+    let cancelled = false;
+    const frame = window.requestAnimationFrame(() => {
+      if (cancelled || !renderedIndexQuotesMatch(marketIndices)) {
+        return;
+      }
+
+      const elapsedMs = pageElapsedMs();
+      trackOnce("dashboard_ready", "dashboard_ready", {
+        indexCount: marketIndices.length,
+        limitUpCount: limitUpStocks.length,
+        elapsedMs
+      });
+      trackOnce("time_to_dashboard", "time_to_dashboard", { elapsedMs });
     });
-    trackOnce("time_to_dashboard", "time_to_dashboard", { elapsedMs });
-  }, [limitUpLoading, limitUpStocks.length, marketIndices.length, marketIndicesLoading]);
+
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(frame);
+    };
+  }, [
+    activeHomeSubpage,
+    activeNav,
+    limitUpError,
+    limitUpLoading,
+    limitUpStocks.length,
+    marketIndices,
+    marketIndicesError,
+    marketIndicesLoading
+  ]);
 
   useEffect(() => {
     if (!selectedStockCode) {
@@ -3088,7 +3119,7 @@ export default function App() {
   }
 
   function handleCompleteDecision() {
-    if (!stockDetail) {
+    if (!stockDetail || !hasShownDecisionConclusion(stockDetail, stockDecisionInsight)) {
       return;
     }
 
@@ -3349,7 +3380,7 @@ export default function App() {
                 <div className="headline-feed">
                   <div className={`impact-dot ${homeHeadline.impact}`} />
                   <div className="headline-feed-copy">
-                    <strong>{homeHeadline.title}</strong>
+                    <strong>【占位】{homeHeadline.title}</strong>
                     <p>
                       {homeHeadline.time} · {homeHeadline.source} · 占位
                     </p>
@@ -3372,11 +3403,13 @@ export default function App() {
                   </p>
                 </div>
               </div>
-              <div className="index-row">
+              <div className="index-row" data-funnel-quotes={marketIndices.length > 0 ? "ready" : "empty"}>
                 {marketIndices.map((index) => (
-                  <div className="index-item" key={index.code ?? index.name}>
-                    <span className="index-name">{index.name}</span>
-                    <strong className={index.change >= 0 ? "up" : "down"}>
+                  <div className="index-item" data-funnel-index={index.code ?? index.name} key={index.code ?? index.name}>
+                    <span className="index-name" data-funnel-index-name>
+                      {index.name}
+                    </span>
+                    <strong className={index.change >= 0 ? "up" : "down"} data-funnel-index-value>
                       {index.value.toFixed(2)}
                     </strong>
                     <span className={`index-change ${index.change >= 0 ? "up" : "down"}`}>
@@ -3943,7 +3976,7 @@ export default function App() {
                   <div className="event-item" key={`${event.time}-${event.title}`}>
                     <div className={`impact-dot ${event.impact}`} />
                     <div>
-                      <strong>{event.title}</strong>
+                      <strong>【占位】{event.title}</strong>
                       <p>
                         {event.time} · {event.source}
                       </p>
@@ -4246,7 +4279,7 @@ export default function App() {
                   </div>
                   <div className="placeholder-card">
                     <strong>更合理的使用顺序</strong>
-                    <p>先在主线看板确认今日最强方向，再进入前排个股，最后结合 AI 材料解读补齐逻辑和风险。</p>
+                    <p>先在主线看板确认今日最强方向，再进入前排个股。材料解读页是规则/模板推演，不是模型结论。</p>
                   </div>
                   <div className="placeholder-card">
                     <strong>辅助参考</strong>
@@ -4486,13 +4519,13 @@ export default function App() {
                       <p><strong>执行：</strong>{stockSimpleQuestionInsight.action}</p>
                     </section>
 
-                    <section className="stock-decision-panel">
+                    <section className="stock-decision-panel" data-funnel-decision-panel>
                       <div className="stock-decision-head">
                         <div>
                           <span className="section-kicker">Rule Decision</span>
                           <h3>个股决策分析</h3>
                         </div>
-                        <strong>{stockDecisionInsight.verdict}</strong>
+                        <strong data-funnel-decision-verdict>{stockDecisionInsight.verdict}</strong>
                       </div>
                       <HeuristicNotice>规则推演，不是真实 AI 结论，也不能替代你自己的交易判断。</HeuristicNotice>
                       <div className="stock-decision-grid">
@@ -4513,6 +4546,7 @@ export default function App() {
                           type="button"
                           className="action-btn"
                           onClick={handleCompleteDecision}
+                          disabled={!stockDetail || stockDetail.price <= 0 || stockDecisionInsight.verdict === "等待数据" || stockDecisionInsight.verdict === "基础分析"}
                         >
                           完成本次决策（仅本机）
                         </button>

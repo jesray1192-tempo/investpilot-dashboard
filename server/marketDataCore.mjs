@@ -33,7 +33,7 @@ export const corsHeaders = {
   "access-control-allow-headers": "Accept, Content-Type"
 };
 
-async function fetchJson(url) {
+async function fetchJsonOnce(url) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), requestTimeoutMs);
 
@@ -67,6 +67,20 @@ async function fetchJson(url) {
   } finally {
     clearTimeout(timer);
   }
+}
+
+async function fetchJson(url) {
+  let lastError = new Error("Upstream request failed");
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return await fetchJsonOnce(url);
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error("Upstream request failed");
+    }
+  }
+
+  throw lastError;
 }
 
 async function fetchJsonFromHosts(pathAndQuery, hosts = quoteHosts) {

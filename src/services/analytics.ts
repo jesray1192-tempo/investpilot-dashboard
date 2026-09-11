@@ -1,3 +1,9 @@
+// Funnel contract (PR #5 acceptance):
+// - landing_view: first paint of the public app
+// - dashboard_ready: only after home overview has rendered live index quotes (not skeleton/empty)
+// - stock_open: visitor opened a stock (does NOT mean the decision is done)
+// - decision_complete: visitor finished the stock decision path AND a conclusion is on screen
+// - api_error / time_to_dashboard: secondary, no PII
 export type FunnelEvent =
   | "landing_view"
   | "dashboard_ready"
