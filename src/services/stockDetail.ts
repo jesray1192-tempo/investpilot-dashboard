@@ -1,4 +1,5 @@
 import { StockDetail, StockTrendPoint } from "../types";
+import { fetchJson } from "./http";
 
 type StockSearchMatch = {
   code: string;
@@ -63,21 +64,6 @@ type CachedApiResponse<T> = {
   error?: string;
 };
 
-async function fetchJson<T>(url: string): Promise<T> {
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      Accept: "application/json, text/plain, */*"
-    }
-  });
-
-  if (!response.ok) {
-    throw new Error(`请求失败: ${response.status}`);
-  }
-
-  return (await response.json()) as T;
-}
-
 async function fetchCachedJson<T>(url: string): Promise<T> {
   const response = await fetchJson<CachedApiResponse<T>>(url);
 
@@ -101,7 +87,8 @@ function normalizePrice(value?: number) {
     return 0;
   }
 
-  return value / 100;
+  // Upstream quote endpoints use fltt=2, so prices and ratios are already real numbers.
+  return value;
 }
 
 function normalizePercent(value?: number) {
@@ -109,7 +96,7 @@ function normalizePercent(value?: number) {
     return 0;
   }
 
-  return value / 100;
+  return value;
 }
 
 function normalizeNullableRatio(value?: number) {
@@ -117,7 +104,7 @@ function normalizeNullableRatio(value?: number) {
     return null;
   }
 
-  return value / 100;
+  return value;
 }
 
 function parseTrendPoint(item: string): StockTrendPoint | null {

@@ -265,10 +265,10 @@ export const dataSources: DataSource[] = [
   {
     id: "eastmoney",
     name: "东方财富",
-    channel: "Choice / 数据终端",
-    status: "planned",
-    coverage: "深度财务、宏观、行业、机构数据",
-    notes: "适合作为专业数据补充层，通常需要商业授权。"
+    channel: "公开行情代理 /api",
+    status: "connected",
+    coverage: "指数、涨停池、个股详情、分时、搜索",
+    notes: "本轮看板和个股决策走 Vercel / 本地 /api 代理，不需要登录。"
   },
   {
     id: "cls",

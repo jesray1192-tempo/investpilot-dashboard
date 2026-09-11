@@ -9,7 +9,8 @@
     "data:server": "node server/marketDataServer.mjs",
     "build": "tsc -b && vite build",
     "ios:sync": "npm run build && npx cap sync ios",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "smoke:api": "node scripts/smoke-api.mjs"
   },
   "dependencies": {
     "@capacitor/cli": "^8.3.3",

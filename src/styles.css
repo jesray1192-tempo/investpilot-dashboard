@@ -230,6 +230,33 @@ button:disabled {
   box-shadow: 0 20px 80px rgba(0, 0, 0, 0.25);
 }
 
+.heuristic-notice {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  padding: 0.45rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(238, 196, 80, 0.12);
+  border: 1px solid rgba(238, 196, 80, 0.28);
+  color: #f3d48a;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.heuristic-notice.placeholder-notice {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: rgba(242, 239, 232, 0.72);
+}
+
+.decision-complete-row {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+}
+
 .section-kicker,
 .index-name {
   text-transform: uppercase;
