@@ -185,26 +185,39 @@ export async function fetchStockSearchMatch(query: string): Promise<StockSearchM
     throw new Error("请输入股票代码或名称。");
   }
 
-  const response = await fetchCachedJson<EastmoneyStockSearchResponse>(
-    `/api/stock/search?input=${encodeURIComponent(normalizedQuery)}`
-  );
-  const candidates =
-    response.QuotationCodeTable?.Data?.filter(
-      (item): item is { Code: string; Name: string } => Boolean(item.Code && item.Name)
-    ) ?? [];
+  try {
+    const response = await fetchCachedJson<EastmoneyStockSearchResponse>(
+      `/api/stock/search?input=${encodeURIComponent(normalizedQuery)}`
+    );
+    const candidates =
+      response.QuotationCodeTable?.Data?.filter(
+        (item): item is { Code: string; Name: string } => Boolean(item.Code && item.Name)
+      ) ?? [];
 
-  const exactMatch =
-    candidates.find((item) => item.Code === normalizedQuery || item.Name === normalizedQuery) ??
-    candidates[0];
+    const exactMatch =
+      candidates.find((item) => item.Code === normalizedQuery || item.Name === normalizedQuery) ??
+      candidates[0];
 
-  if (!exactMatch) {
-    throw new Error("未找到匹配的股票代码或名称。");
+    if (exactMatch) {
+      return {
+        code: exactMatch.Code,
+        name: exactMatch.Name
+      };
+    }
+  } catch (error) {
+    if (!/^\d{6}$/.test(normalizedQuery)) {
+      throw error;
+    }
   }
 
-  return {
-    code: exactMatch.Code,
-    name: exactMatch.Name
-  };
+  if (/^\d{6}$/.test(normalizedQuery)) {
+    return {
+      code: normalizedQuery,
+      name: normalizedQuery
+    };
+  }
+
+  throw new Error("未找到匹配的股票代码或名称。");
 }
 
 export async function fetchLiveStockQuoteSnapshot(code: string): Promise<StockQuoteSnapshot> {
