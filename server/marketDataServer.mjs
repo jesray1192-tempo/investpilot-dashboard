@@ -25,6 +25,15 @@ const server = createServer(async (request, response) => {
   sendJson(response, result.statusCode, result.payload);
 });
 
+server.on("error", (error) => {
+  if (error.code === "EADDRINUSE") {
+    console.error(`Market data server port ${port} is already in use.`);
+  } else {
+    console.error("Market data server failed:", error);
+  }
+  process.exit(1);
+});
+
 server.listen(port, "127.0.0.1", () => {
   console.log(`Market data server listening on http://127.0.0.1:${port}`);
 });

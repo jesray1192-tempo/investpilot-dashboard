@@ -1,13 +1,19 @@
 import { spawn } from "node:child_process";
 
-const children = [
-  spawn(process.execPath, ["server/marketDataServer.mjs"], {
-    stdio: "inherit"
-  }),
-  spawn(process.platform === "win32" ? "npx.cmd" : "npx", ["vite"], {
-    stdio: "inherit"
-  })
+const processes = [
+  { label: "market-data-server", command: process.execPath, args: ["server/marketDataServer.mjs"] },
+  {
+    label: "vite",
+    command: process.platform === "win32" ? "npx.cmd" : "npx",
+    args: ["vite"]
+  }
 ];
+
+const children = processes.map(({ label, command, args }) => {
+  const child = spawn(command, args, { stdio: "inherit" });
+  child.label = label;
+  return child;
+});
 
 let shuttingDown = false;
 
@@ -29,6 +35,13 @@ for (const child of children) {
   child.on("exit", (code, signal) => {
     if (!shuttingDown && (code || signal)) {
       shutdown(code ?? 1);
+    }
+  });
+
+  child.on("error", (error) => {
+    console.error(`[dev] failed to run "${child.label}":`, error);
+    if (!shuttingDown) {
+      shutdown(1);
     }
   });
 }
